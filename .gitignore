@@ -1,0 +1,30 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+
+# Editor / IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.swp
+
+# TypeScript / Vite cache
+*.tsbuildinfo
+.vite/
+
+# tsc -b artifacts for vite.config
+vite.config.js
+vite.config.d.ts
+
+# OS noise
+Thumbs.db
+
+# Vercel
+.vercel
+

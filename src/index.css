@@ -1,0 +1,75 @@
+/* Editorial typography · 衬线标题 + 干净的中文正文 */
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-paper text-ink-900 font-sans antialiased;
+    font-feature-settings: "ss01", "cv02", "cv03", "tnum";
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: theme('colors.rouge.100');
+    color: theme('colors.ink.900');
+  }
+}
+
+@layer components {
+  /* 编辑风的眉头 —— 全大写 + letter spacing */
+  .eyebrow {
+    @apply text-eyebrow uppercase tracking-widest text-ink-500 font-medium;
+  }
+  /* 衬线大标题 */
+  .display-serif {
+    @apply font-serif text-ink-900;
+    font-weight: 500;
+  }
+  /* 卡片 · 不再有夸张阴影，只有一根细线 */
+  .panel {
+    @apply bg-paper-50 rounded-none border-t border-ink-200 py-8;
+  }
+  .card {
+    @apply bg-paper-50 border border-ink-200 p-6;
+  }
+  .card-flat {
+    @apply bg-paper-50 border-t border-ink-200 py-6;
+  }
+  /* 按钮 —— 长方形，朴素 */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 text-small font-medium transition;
+  }
+  .btn-primary {
+    @apply btn bg-ink-900 text-paper hover:bg-ink-800;
+  }
+  .btn-ghost {
+    @apply btn text-ink-700 hover:bg-ink-100;
+  }
+  .btn-rouge {
+    @apply btn bg-rouge-500 text-paper hover:bg-rouge-600;
+  }
+  .btn-outline {
+    @apply btn border border-ink-300 text-ink-700 hover:bg-ink-100;
+  }
+  /* 横向细分隔 */
+  .rule {
+    @apply h-px bg-ink-200;
+  }
+  /* 数字 · oldstyle, tabular */
+  .num {
+    font-family: theme('fontFamily.numeric');
+    font-variant-numeric: tabular-nums oldstyle-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* 细滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: theme('colors.ink.200'); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.ink.300'); }
