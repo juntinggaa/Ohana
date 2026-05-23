@@ -31,12 +31,34 @@ function newDraftId() {
   return `d-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function inferTraits(d: DraftMember): string[] {
+  const traits = new Set<string>()
+  if (d.capacity === 'flexible') traits.add('时间灵活')
+  if (d.capacity === 'medium') traits.add('可协调时间')
+  if (/伴侣|丈夫|妻子|老公|老婆/.test(d.relation)) {
+    traits.add('家务行政')
+    traits.add('日历可靠')
+  }
+  if (/弟弟|妹妹|哥哥|姐姐/.test(d.relation)) {
+    traits.add('可跑腿')
+  }
+  if (/妈妈|爸爸|母亲|父亲/.test(d.relation)) {
+    traits.add('了解家里状况')
+    traits.add('会拍照')
+  }
+  if (/孩子|儿子|女儿/.test(d.relation)) {
+    traits.add('只能做简单事')
+  }
+  return Array.from(traits)
+}
+
 export function WelcomePage() {
   const navigate = useNavigate()
   const setFamily = useAppStore((s) => s.setFamily)
   const dismissWelcome = useAppStore((s) => s.dismissWelcome)
   const setCurrentUser = useAppStore((s) => s.setCurrentUser)
   const resetToSampleData = useAppStore((s) => s.resetToSampleData)
+  const clearAll = useAppStore((s) => s.clearAll)
   const pushToast = useAppStore((s) => s.pushToast)
 
   const [drafts, setDrafts] = useState<DraftMember[]>([
@@ -98,19 +120,23 @@ export function WelcomePage() {
       city: d.city.trim() || undefined,
       capacity: (d.capacity || undefined) as CapacityTag | undefined,
       notes: d.notes.trim() || undefined,
+      traits: inferTraits(d),
     }))
+    // 用户填了自己的家 · 先清掉示例任务/通知/家庭记忆，从一张白纸开始
+    clearAll()
     setFamily(members)
     setCurrentUser(me.isMe ? 'me' : members[0].id)
     dismissWelcome()
-    pushToast(`欢迎，${me.name} · 你的家庭已建好`, 'success')
-    navigate('/inbox')
+    pushToast(`欢迎，${me.name} · 现在告诉 AI 你想记下什么`, 'success')
+    // 直接进 AI 对话页 —— 这是用户自有家庭的唯一任务入口
+    navigate('/memory')
   }
 
   function useSampleFamily() {
     resetToSampleData()
     dismissWelcome()
-    pushToast('已载入示例家庭（唐宁家） · 你可以在「家庭」页改成自己的', 'info')
-    navigate('/dashboard')
+    pushToast('已载入唐宁家 · 先让 AI 从消息里识别任务', 'info')
+    navigate('/memory?mode=paste')
   }
 
   return (
@@ -154,7 +180,7 @@ export function WelcomePage() {
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
                     className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
-                    placeholder={d.isMe ? '你的名字' : '例如：妈妈 / 弟弟 / 周勉'}
+                    placeholder={d.isMe ? '你的名字' : '例如：妈妈 / 弟弟 / 伴侣'}
                   />
                 </Field>
                 <Field label="关系">

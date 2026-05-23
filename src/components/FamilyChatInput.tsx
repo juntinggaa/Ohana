@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Loader2, Sparkles, FileText } from 'lucide-react'
 import { FAMILY_CHAT_RAW } from '@/lib/mockData'
 import { analyzeFamilyMessages, type CapturedTask } from '@/lib/agents/taskCaptureAgent'
 import { FileUploader } from './FileUploader'
 import { hasMistralKey } from '@/lib/ocr/mistralOcr'
+import { useAppStore } from '@/lib/store'
 
 interface Props {
   onCaptured: (tasks: CapturedTask[], mode: 'mock' | 'remote', remoteError?: string) => void
@@ -12,16 +13,23 @@ interface Props {
 type InputMode = 'paste' | 'upload'
 
 export function FamilyChatInput({ onCaptured }: Props) {
+  const members = useAppStore((s) => s.familyMembers)
+  const currentUserId = useAppStore((s) => s.currentUserId)
+  const isSampleFamily = members.some((m) => m.id === 'tangning')
   const [mode, setMode] = useState<InputMode>('paste')
-  const [value, setValue] = useState(FAMILY_CHAT_RAW)
+  const [value, setValue] = useState(() => (isSampleFamily ? FAMILY_CHAT_RAW : ''))
   const [loading, setLoading] = useState(false)
   const [ocrInfo, setOcrInfo] = useState<{ filename: string; pages: number } | null>(null)
   const [ocrError, setOcrError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!isSampleFamily && value === FAMILY_CHAT_RAW) setValue('')
+  }, [isSampleFamily, value])
+
   async function run() {
     setLoading(true)
     try {
-      const res = await analyzeFamilyMessages(value)
+      const res = await analyzeFamilyMessages(value, { members, currentUserId })
       onCaptured(res.data, res.mode, res.remoteError)
     } finally {
       setLoading(false)
@@ -66,7 +74,7 @@ export function FamilyChatInput({ onCaptured }: Props) {
             上传图片 / PDF
           </button>
         </div>
-        {mode === 'paste' && (
+        {mode === 'paste' && isSampleFamily && (
           <button
             className="text-tiny text-ink-500 hover:text-ink-900 underline underline-offset-4"
             onClick={() => {
@@ -122,7 +130,7 @@ export function FamilyChatInput({ onCaptured }: Props) {
                        focus:outline-none focus:border-ink-700 transition resize-none"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="把家庭群、医院通知、学校群、物业短信粘进来&#10;&#10;每行一条消息，格式不限"
+            placeholder="把你的家庭群、医院通知、学校群、物业短信粘进来&#10;&#10;每行一条消息，格式不限。AI 会按你自己的家人来推荐负责人。"
             disabled={loading}
           />
           <div className="flex items-center justify-between gap-4">

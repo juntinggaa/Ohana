@@ -64,7 +64,7 @@ export function Layout() {
       <header className="border-b border-ink-200 bg-paper sticky top-0 z-30 backdrop-blur-sm bg-paper/95">
         <div className="max-w-6xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-4">
           <Link to="/me" className="group shrink-0">
-            <Logo withWordmark size={22} />
+            <Logo withWordmark size={32} />
           </Link>
 
           <nav className="flex items-center gap-1">
@@ -137,7 +137,7 @@ export function Layout() {
       <footer className="border-t border-ink-200 py-6 mt-12">
         <div className="max-w-6xl mx-auto px-8 lg:px-12 flex items-center justify-between text-tiny text-ink-500">
           <span className="inline-flex items-center gap-2">
-            <Logo size={12} />
+            <Logo size={16} />
             欧哈娜 · Ohana · 黑客松原型
           </span>
           <Link to="/settings" className="hover:text-ink-900">

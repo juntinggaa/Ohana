@@ -97,7 +97,7 @@ export interface CareTask {
   sourceMessageIds: string[]     // 关联的原始消息
   sourceSummary: string          // 一句话回顾消息
   originatorId: string           // 一般是"妈妈"或"系统"
-  /** 来源更具体的标签，例如 "医院提醒" / "幼儿园群" / "物业通知" / "唐宁脑中" */
+  /** 来源更具体的标签，例如 "医院提醒" / "幼儿园群" / "物业通知" / "我想到的事" */
   originatorLabel?: string
   executorId?: string            // 当前执行人
   verifierId?: string            // 证明上传人
@@ -131,7 +131,7 @@ export type RiskType =
   | 'vague_acknowledgement'       // "收到" 没下文
   | 'missing_deadline'
   | 'missing_proof'
-  | 'fallback_to_originator'      // 任务会回到唐宁
+  | 'fallback_to_originator'      // 任务会回到发起人
   | 'overloaded_originator'       // 发起人已超载
 
 export interface ResponsibilityRisk {
@@ -182,7 +182,7 @@ export type NotificationKind =
   | 'rejected'     // 有人拒绝了你发出的任务
   | 'snoozed'      // 有人推迟回复
   | 'completed'    // 任务被标记完成
-  | 'nudge'        // 唐宁追问
+  | 'nudge'        // 发起人追问
 
 export interface AppNotification {
   id: string

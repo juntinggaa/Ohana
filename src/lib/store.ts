@@ -23,13 +23,8 @@ import type {
   TaskAttachment,
   TaskResponse,
 } from './types'
-import {
-  FAMILY_MEMBERS,
-  SAMPLE_TASKS,
-  SAMPLE_RISKS,
-  MENTAL_LOAD_BEFORE,
-  MENTAL_LOAD_AFTER,
-} from './mockData'
+import { FAMILY_MEMBERS, MENTAL_LOAD_BEFORE } from './mockData'
+import { buildSnapshot } from './mentalLoad'
 import { generateWorkflow } from './agents/careWorkflowAgent'
 import { recommendForCategoryFallback } from './agents/assignmentAgent'
 import type { CapturedTask } from './agents/taskCaptureAgent'
@@ -101,6 +96,8 @@ interface AppState {
   setSubtaskOwner: (taskId: string, subtaskId: string, ownerId: string | undefined) => void
   /** Sets every sub-task's ownerId = suggestedOwnerId; returns the new ownership map */
   assignAllRecommended: (taskId: string) => Record<string, string>
+  /** Mark existing owner assignments as sent and waiting for confirmation. */
+  markAssignmentsSent: (taskId: string) => void
   markTaskCompleted: (taskId: string) => void
   removeTask: (taskId: string) => void
   addAttachment: (taskId: string, subtaskId: string | null, att: Omit<TaskAttachment, 'id' | 'createdAt'>) => void
@@ -152,23 +149,111 @@ function withRedistribution(
   before: MentalLoadEntry[],
   acceptedCount: number,
 ): MentalLoadEntry[] {
+  if (before.length === 0) return []
   const factor = Math.min(acceptedCount * 0.06, 0.55)
   const adjusted = before.map((e) => ({ ...e }))
-  const tn = adjusted.find((e) => e.memberId === 'tangning')
-  if (!tn) return adjusted
-  const moved = tn.score * factor
-  tn.score = Math.max(0, tn.score - moved)
-  ;(['bro', 'zhou'] as const).forEach((id) => {
-    const e = adjusted.find((x) => x.memberId === id)
-    if (e) e.score += moved / 2
+  const source =
+    adjusted.find((e) => e.memberId === 'tangning') ??
+    adjusted.slice().sort((a, b) => b.score - a.score)[0]
+  if (!source || source.score <= 0 || factor <= 0) return adjusted
+  const moved = source.score * factor
+  source.score = Math.max(0, source.score - moved)
+  const receivers = adjusted.filter((e) => e.memberId !== source.memberId)
+  receivers.forEach((e) => {
+    e.score += moved / Math.max(receivers.length, 1)
   })
   const total = adjusted.reduce((s, e) => s + e.score, 0) || 1
   adjusted.forEach((e) => (e.percentage = e.score / total))
   return adjusted
 }
 
+function assigneeIdsForLoad(task: CareTask): string[] {
+  const ids = new Set<string>()
+  if (task.executorId) ids.add(task.executorId)
+  task.subtasks.forEach((sub) => {
+    if (sub.ownerId) ids.add(sub.ownerId)
+  })
+  if (ids.size === 0 && task.suggestedOwnerId) ids.add(task.suggestedOwnerId)
+  return Array.from(ids)
+}
+
+export function buildMentalLoadEntriesFromTasks(
+  tasks: CareTask[],
+  members: FamilyMember[],
+): MentalLoadEntry[] {
+  const memberIds = new Set(members.map((m) => m.id))
+  const raw: Record<string, Omit<MentalLoadEntry, 'memberId' | 'score' | 'percentage'>> = {}
+  members.forEach((m) => {
+    raw[m.id] = {
+      originated: 0,
+      executed: 0,
+      followUps: 0,
+      verified: 0,
+      fallbacks: 0,
+    }
+  })
+
+  tasks.forEach((task) => {
+    if (memberIds.has(task.originatorId)) {
+      raw[task.originatorId].originated += 1
+      if (task.status === 'needs_owner' || task.status === 'pending_acceptance') {
+        raw[task.originatorId].followUps += 1
+      }
+      if (task.status === 'fallback_risk') raw[task.originatorId].fallbacks += 1
+    }
+    assigneeIdsForLoad(task).forEach((id) => {
+      if (memberIds.has(id)) raw[id].executed += 1
+    })
+    if (task.status === 'completed') {
+      const verifier = task.verifierId ?? task.executorId
+      if (verifier && memberIds.has(verifier)) raw[verifier].verified += 1
+    }
+  })
+
+  return buildSnapshot(members, raw, '本周').entries
+}
+
+export function buildMentalLoadPatch(
+  members: FamilyMember[],
+  tasks: CareTask[],
+  accepted: Record<string, AcceptedRecord>,
+): Pick<AppState, 'mentalLoadBefore' | 'mentalLoadAfter'> {
+  const mentalLoadBefore = buildMentalLoadEntriesFromTasks(tasks, members)
+  return {
+    mentalLoadBefore,
+    mentalLoadAfter: withRedistribution(mentalLoadBefore, Object.keys(accepted).length),
+  }
+}
+
 const newId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+const acceptedRecordKey = (taskId: string, ownerId: string) => `${taskId}:${ownerId}`
+
+function actualAssigneeIdsForStore(task: CareTask): string[] {
+  const ids = new Set<string>()
+  if (task.executorId) ids.add(task.executorId)
+  task.subtasks.forEach((sub) => {
+    if (sub.ownerId) ids.add(sub.ownerId)
+  })
+  return Array.from(ids)
+}
+
+function keepAcceptedAssignees(task: CareTask): string[] {
+  const assignees = actualAssigneeIdsForStore(task)
+  return (task.acceptedBy ?? []).filter((id) => assignees.includes(id))
+}
+
+function taskAssigneeIdsForNotify(task: CareTask): string[] {
+  const ids = new Set<string>()
+  if (task.executorId) ids.add(task.executorId)
+  if (task.suggestedOwnerId) ids.add(task.suggestedOwnerId)
+  task.subtasks.forEach((sub) => {
+    if (sub.ownerId) ids.add(sub.ownerId)
+    if (sub.suggestedOwnerId) ids.add(sub.suggestedOwnerId)
+  })
+  return Array.from(ids)
+}
 
 /* -------------------------------------------------------------------------- */
 /* Store                                                                      */
@@ -178,18 +263,18 @@ export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
       // identity
-      currentUserId: 'tangning',
+      currentUserId: '',
       hasSeenWelcome: false,
       uiModeOverride: 'auto',
 
       // family
-      familyMembers: FAMILY_MEMBERS,
+      familyMembers: [],
 
       // tasks / analysis
-      tasks: normalizeTasks(SAMPLE_TASKS),
-      risks: SAMPLE_RISKS,
-      mentalLoadBefore: MENTAL_LOAD_BEFORE.entries,
-      mentalLoadAfter: MENTAL_LOAD_AFTER.entries,
+      tasks: [],
+      risks: [],
+      mentalLoadBefore: [],
+      mentalLoadAfter: [],
       accepted: {},
 
       // multi-user
@@ -234,9 +319,29 @@ export const useAppStore = create<AppState>()(
         })),
 
       removeFamilyMember: (id) =>
-        set((s) => ({ familyMembers: s.familyMembers.filter((m) => m.id !== id) })),
+        set((s) => {
+          const familyMembers = s.familyMembers.filter((m) => m.id !== id)
+          const currentUserId = familyMembers.some((m) => m.id === s.currentUserId)
+            ? s.currentUserId
+            : familyMembers[0]?.id ?? ''
+          return {
+            familyMembers,
+            currentUserId,
+            ...buildMentalLoadPatch(familyMembers, s.tasks, s.accepted),
+          }
+        }),
 
-      setFamily: (members) => set({ familyMembers: members }),
+      setFamily: (members) =>
+        set((s) => {
+          const currentUserId = members.some((m) => m.id === s.currentUserId)
+            ? s.currentUserId
+            : members.find((m) => m.relation === '我自己')?.id ?? members[0]?.id ?? ''
+          return {
+            familyMembers: members,
+            currentUserId,
+            ...buildMentalLoadPatch(members, s.tasks, s.accepted),
+          }
+        }),
 
       addTrait: (memberId, trait) => {
         const clean = trait.trim()
@@ -286,27 +391,36 @@ export const useAppStore = create<AppState>()(
           added.push(task)
         })
         if (added.length > 0) {
-          set((s) => ({ tasks: [...added, ...s.tasks] }))
+          set((s) => {
+            const tasks = [...added, ...s.tasks]
+            return {
+              tasks,
+              ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+            }
+          })
         }
         return added
       },
 
       acceptResponsibility: (taskId, ownerId, deadline) => {
         set((s) => {
-          const accepted = {
-            ...s.accepted,
-            [taskId]: { taskId, ownerId, deadline, acceptedAt: Date.now() },
+          const tasks = s.tasks.map((t) => {
+            if (t.id !== taskId) return t
+            const next: CareTask = {
+              ...t,
+              executorId: ownerId,
+              dueDateText: deadline,
+            }
+            return {
+              ...next,
+              status: 'pending_acceptance' as const,
+              acceptedBy: keepAcceptedAssignees(next),
+            }
+          })
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
           }
-          const tasks = s.tasks.map((t) =>
-            t.id === taskId
-              ? { ...t, status: 'accepted' as const, executorId: ownerId, dueDateText: deadline }
-              : t,
-          )
-          const mentalLoadAfter = withRedistribution(
-            s.mentalLoadBefore,
-            Object.keys(accepted).length,
-          )
-          return { accepted, tasks, mentalLoadAfter }
         })
         // 通知被指派的人
         const task = get().tasks.find((t) => t.id === taskId)
@@ -318,23 +432,30 @@ export const useAppStore = create<AppState>()(
             taskId,
           })
         }
-        get().pushToast('已发出承接卡片到家庭群', 'success')
+        get().pushToast('已发出指派卡片到家庭群 · 等对方确认', 'success')
       },
 
       unacceptResponsibility: (taskId) => {
         set((s) => {
           const accepted = { ...s.accepted }
-          delete accepted[taskId]
+          Object.entries(accepted).forEach(([key, record]) => {
+            if (record.taskId === taskId) delete accepted[key]
+          })
           const tasks = s.tasks.map((t) =>
             t.id === taskId
-              ? { ...t, status: 'needs_owner' as const, executorId: undefined }
+              ? {
+                  ...t,
+                  status: 'needs_owner' as const,
+                  executorId: undefined,
+                  acceptedBy: [],
+                }
               : t,
           )
-          const mentalLoadAfter = withRedistribution(
-            s.mentalLoadBefore,
-            Object.keys(accepted).length,
-          )
-          return { accepted, tasks, mentalLoadAfter }
+          return {
+            accepted,
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, accepted),
+          }
         })
       },
 
@@ -354,8 +475,8 @@ export const useAppStore = create<AppState>()(
       },
 
       setSubtaskOwner: (taskId, subtaskId, ownerId) => {
-        set((s) => ({
-          tasks: s.tasks.map((t) =>
+        set((s) => {
+          const tasks = s.tasks.map((t) =>
             t.id !== taskId
               ? t
               : {
@@ -364,8 +485,12 @@ export const useAppStore = create<AppState>()(
                     sub.id === subtaskId ? { ...sub, ownerId } : sub,
                   ),
                 },
-          ),
-        }))
+          )
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+          }
+        })
       },
 
       assignAllRecommended: (taskId) => {
@@ -378,31 +503,63 @@ export const useAppStore = create<AppState>()(
             recommendForCategoryFallback(taskForReco.category, members)
           : undefined
 
-        set((s) => ({
-          tasks: s.tasks.map((t) => {
+        set((s) => {
+          const tasks = s.tasks.map((t) => {
             if (t.id !== taskId) return t
-            return {
+            const subtasks = t.subtasks.map((sub) => {
+              const owner = sub.suggestedOwnerId ?? sub.ownerId ?? fallbackOwner
+              if (owner) ownership[owner] = (ownership[owner] ?? '') + sub.title + ' / '
+              return { ...sub, ownerId: owner }
+            })
+            const next: CareTask = {
               ...t,
               // 主任务 executor 也跟着推荐
               executorId: t.executorId ?? t.suggestedOwnerId ?? fallbackOwner,
-              status:
-                t.status === 'needs_owner' || t.status === 'fallback_risk'
-                  ? 'pending_acceptance'
-                  : t.status,
-              subtasks: t.subtasks.map((sub) => {
-                const owner = sub.suggestedOwnerId ?? sub.ownerId ?? fallbackOwner
-                if (owner) ownership[owner] = (ownership[owner] ?? '') + sub.title + ' / '
-                return { ...sub, ownerId: owner }
-              }),
+              subtasks,
             }
-          }),
-        }))
+            const nextStatus: CareTask['status'] =
+              next.status === 'completed' ? next.status : 'pending_acceptance'
+            const finalTask: CareTask = {
+              ...next,
+              status: nextStatus,
+              acceptedBy: keepAcceptedAssignees(next),
+            }
+            return finalTask
+          })
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+          }
+        })
         return ownership
       },
 
+      markAssignmentsSent: (taskId) => {
+        set((s) => {
+          const tasks = s.tasks.map((t) => {
+            if (t.id !== taskId || t.status === 'completed') return t
+            const hasActualOwner = actualAssigneeIdsForStore(t).length > 0
+            const next: CareTask = {
+              ...t,
+              executorId: hasActualOwner ? t.executorId : t.suggestedOwnerId,
+            }
+            if (actualAssigneeIdsForStore(next).length === 0) return t
+            return {
+              ...next,
+              status: 'pending_acceptance' as const,
+              acceptedBy: keepAcceptedAssignees(next),
+            }
+          })
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+          }
+        })
+      },
+
       markTaskCompleted: (taskId) => {
-        set((s) => ({
-          tasks: s.tasks.map((t) =>
+        set((s) => {
+          const tasks = s.tasks.map((t) =>
             t.id === taskId
               ? {
                   ...t,
@@ -410,13 +567,23 @@ export const useAppStore = create<AppState>()(
                   subtasks: t.subtasks.map((sub) => ({ ...sub, completed: true })),
                 }
               : t,
-          ),
-        }))
+          )
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+          }
+        })
         get().pushToast('任务已标记完成', 'success')
       },
 
       removeTask: (taskId) =>
-        set((s) => ({ tasks: s.tasks.filter((t) => t.id !== taskId) })),
+        set((s) => {
+          const tasks = s.tasks.filter((t) => t.id !== taskId)
+          return {
+            tasks,
+            ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+          }
+        }),
 
       addAttachment: (taskId, subtaskId, att) => {
         const fullAtt: TaskAttachment = {
@@ -479,13 +646,26 @@ export const useAppStore = create<AppState>()(
         }
         set((s) => ({ responses: [resp, ...s.responses] }))
 
-        // 更新任务状态 + 通知发起人
-        const assigner = task.originatorId !== responderId ? task.originatorId : 'tangning'
+        // 更新任务状态 + 通知发起/协调人
+        const assigner =
+          task.originatorId !== responderId
+            ? task.originatorId
+            : taskAssigneeIdsForNotify(task).find((id) => id !== responderId) ??
+              get().familyMembers.find((m) => m.id !== responderId)?.id
         const responderName = nameOf(responderId, get().familyMembers)
 
         if (action === 'accepted') {
-          set((s) => ({
-            tasks: s.tasks.map((t) => {
+          set((s) => {
+            const accepted: Record<string, AcceptedRecord> = {
+              ...s.accepted,
+              [acceptedRecordKey(taskId, responderId)]: {
+                taskId,
+                ownerId: responderId,
+                deadline: task.dueDateText ?? '本周内',
+                acceptedAt: Date.now(),
+              },
+            }
+            const tasks = s.tasks.map((t) => {
               if (t.id !== taskId) return t
               // 收集所有应承接的人 · 优先看子任务 ownerId · 没有子任务再看 executor
               const subAssignees = Array.from(
@@ -509,16 +689,23 @@ export const useAppStore = create<AppState>()(
                 acceptedBy,
                 // 单人任务：设 executor · 多人任务：保持原样
                 executorId: subAssignees.length === 0 ? responderId : t.executorId,
-                status: allAccepted ? 'accepted' : 'pending_acceptance',
+                status: allAccepted ? ('accepted' as const) : ('pending_acceptance' as const),
               }
-            }),
-          }))
-          get().pushNotification({
-            recipientId: assigner,
-            kind: 'accepted',
-            message: `${responderName} 承接了「${task.title}」`,
-            taskId,
+            })
+            return {
+              accepted,
+              tasks,
+              ...buildMentalLoadPatch(s.familyMembers, tasks, accepted),
+            }
           })
+          if (assigner) {
+            get().pushNotification({
+              recipientId: assigner,
+              kind: 'accepted',
+              message: `${responderName} 承接了「${task.title}」`,
+              taskId,
+            })
+          }
           // 检查是否全员承接
           const updated = get().tasks.find((t) => t.id === taskId)
           if (updated?.status === 'accepted') {
@@ -540,8 +727,14 @@ export const useAppStore = create<AppState>()(
             )
           }
         } else if (action === 'rejected') {
-          set((s) => ({
-            tasks: s.tasks.map((t) => {
+          set((s) => {
+            const accepted: Record<string, AcceptedRecord> = { ...s.accepted }
+            Object.entries(accepted).forEach(([key, record]) => {
+              if (record.taskId === taskId && record.ownerId === responderId) {
+                delete accepted[key]
+              }
+            })
+            const tasks = s.tasks.map((t) => {
               if (t.id !== taskId) return t
               // 多人任务：只清空"这个人"的子任务 ownership，整体状态保留
               const subtasks = t.subtasks.map((sub) =>
@@ -555,30 +748,39 @@ export const useAppStore = create<AppState>()(
                 executorId: t.executorId === responderId ? undefined : t.executorId,
                 status: stillHasOwners ? t.status : 'needs_owner',
               }
-            }),
-          }))
-          // AI 重新推荐：避开拒绝的人 + 唐宁
+            })
+            return {
+              accepted,
+              tasks,
+              ...buildMentalLoadPatch(s.familyMembers, tasks, accepted),
+            }
+          })
+          // AI 重新推荐：避开拒绝的人和明显超载的人
           const alternatives = get().familyMembers.filter(
-            (m) => m.id !== responderId && m.id !== 'tangning',
+            (m) => m.id !== responderId && !(m.traits ?? []).includes('已超载'),
           )
           const altText =
             alternatives.length > 0
               ? `AI 建议改派 ${alternatives.slice(0, 2).map((m) => m.name).join(' / ')}`
               : '请重新分派'
-          get().pushNotification({
-            recipientId: assigner,
-            kind: 'rejected',
-            message: `${responderName} 接不了「${task.title}」${reason ? ' · ' + reason : ''} · ${altText}`,
-            taskId,
-          })
+          if (assigner) {
+            get().pushNotification({
+              recipientId: assigner,
+              kind: 'rejected',
+              message: `${responderName} 接不了「${task.title}」${reason ? ' · ' + reason : ''} · ${altText}`,
+              taskId,
+            })
+          }
           get().pushToast('已告知发起人 · AI 在重新推荐', 'info')
         } else if (action === 'snoozed') {
-          get().pushNotification({
-            recipientId: assigner,
-            kind: 'snoozed',
-            message: `${responderName} 暂缓回复「${task.title}」 · 4 小时后再问`,
-            taskId,
-          })
+          if (assigner) {
+            get().pushNotification({
+              recipientId: assigner,
+              kind: 'snoozed',
+              message: `${responderName} 暂缓回复「${task.title}」 · 4 小时后再问`,
+              taskId,
+            })
+          }
           get().pushToast('已推迟，稍后会再提醒', 'info')
         }
       },
@@ -613,13 +815,16 @@ export const useAppStore = create<AppState>()(
         })),
 
       // ───── system ───────────────────────────────────
+      // 载入示例家庭 = 唐宁家的家人 + 一张白纸的事项
+      // 用户必须用「家庭记忆助手」（AI 对话）逐步把事情说出来 ·
+      // 不会一进来就被 5 条预设任务砸到脸上。
       resetToSampleData: () =>
         set({
           familyMembers: FAMILY_MEMBERS,
-          tasks: normalizeTasks(SAMPLE_TASKS),
-          risks: SAMPLE_RISKS,
+          tasks: [],
+          risks: [],
           mentalLoadBefore: MENTAL_LOAD_BEFORE.entries,
-          mentalLoadAfter: MENTAL_LOAD_AFTER.entries,
+          mentalLoadAfter: MENTAL_LOAD_BEFORE.entries,
           accepted: {},
           responses: [],
           notifications: [],
@@ -629,15 +834,18 @@ export const useAppStore = create<AppState>()(
         }),
 
       clearAll: () =>
-        set({
-          tasks: [],
-          risks: [],
-          accepted: {},
-          responses: [],
-          notifications: [],
-          familyMemoryEntries: [],
-          mentalLoadBefore: MENTAL_LOAD_BEFORE.entries,
-          mentalLoadAfter: MENTAL_LOAD_AFTER.entries,
+        set((s) => {
+          const tasks: CareTask[] = []
+          const accepted = {}
+          return {
+            tasks,
+            risks: [],
+            accepted,
+            responses: [],
+            notifications: [],
+            familyMemoryEntries: [],
+            ...buildMentalLoadPatch(s.familyMembers, tasks, accepted),
+          }
         }),
 
       // ───── toast ────────────────────────────────────
@@ -651,7 +859,7 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
     }),
     {
-      name: 'backstage-audit:v6',
+      name: 'ohana:v1',
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({
         currentUserId: s.currentUserId,
@@ -671,8 +879,9 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return
         state.tasks = normalizeTasks(state.tasks)
-        if (!Array.isArray(state.familyMembers) || state.familyMembers.length === 0) {
-          state.familyMembers = FAMILY_MEMBERS
+        if (!Array.isArray(state.familyMembers)) state.familyMembers = []
+        if (state.familyMembers.length === 0 && state.hasSeenWelcome) {
+          state.hasSeenWelcome = false
         }
         // 老数据可能没有 traits / uiMode —— 用示例家庭的同 id 补齐
         state.familyMembers = state.familyMembers.map((m) => {
@@ -684,19 +893,44 @@ export const useAppStore = create<AppState>()(
             uiMode: m.uiMode ?? seed?.uiMode,
           }
         })
-        if (!Array.isArray(state.risks)) state.risks = SAMPLE_RISKS
-        if (!Array.isArray(state.mentalLoadBefore))
-          state.mentalLoadBefore = MENTAL_LOAD_BEFORE.entries
-        if (!Array.isArray(state.mentalLoadAfter))
-          state.mentalLoadAfter = MENTAL_LOAD_AFTER.entries
+        if (!Array.isArray(state.risks)) state.risks = []
+        if (!Array.isArray(state.mentalLoadBefore)) state.mentalLoadBefore = []
+        if (!Array.isArray(state.mentalLoadAfter)) state.mentalLoadAfter = []
         if (!state.accepted || typeof state.accepted !== 'object') state.accepted = {}
         if (!Array.isArray(state.responses)) state.responses = []
         if (!Array.isArray(state.notifications)) state.notifications = []
         if (!Array.isArray(state.familyMemoryEntries)) state.familyMemoryEntries = []
         if (!state.uiModeOverride) state.uiModeOverride = 'auto'
+        // v8 之前："指派并标记已发出"会把任务误标成 accepted。
+        // 真正的承接一定有 accepted response；没有回应记录的 accepted 视为仍待确认。
+        const acceptedResponseKeys = new Set(
+          state.responses
+            .filter((r) => r.action === 'accepted')
+            .map((r) => acceptedRecordKey(r.taskId, r.responderId)),
+        )
+        state.tasks = state.tasks.map((t) => {
+          if (t.status !== 'accepted') return t
+          const acceptedBy = (t.acceptedBy ?? []).filter((id) =>
+            acceptedResponseKeys.has(acceptedRecordKey(t.id, id)),
+          )
+          if (acceptedBy.length > 0) return { ...t, acceptedBy }
+          return { ...t, status: 'pending_acceptance' as const, acceptedBy: [] }
+        })
+        Object.entries(state.accepted).forEach(([key, record]) => {
+          if (!acceptedResponseKeys.has(acceptedRecordKey(record.taskId, record.ownerId))) {
+            delete state.accepted[key]
+          }
+        })
+        const loadPatch = buildMentalLoadPatch(
+          state.familyMembers,
+          state.tasks,
+          state.accepted,
+        )
+        state.mentalLoadBefore = loadPatch.mentalLoadBefore
+        state.mentalLoadAfter = loadPatch.mentalLoadAfter
         // 确保 currentUserId 存在于 familyMembers 中，否则回到第一个成员
         if (!state.familyMembers.some((m) => m.id === state.currentUserId)) {
-          state.currentUserId = state.familyMembers[0]?.id ?? 'tangning'
+          state.currentUserId = state.familyMembers[0]?.id ?? ''
         }
       },
     },

@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { WeeklyMentalLoadSnapshot } from '@/lib/types'
-import { getMember } from '@/lib/mockData'
 import { Avatar } from './Avatar'
 import { cn, formatPercent } from '@/lib/utils'
+import { useAppStore } from '@/lib/store'
 
 interface Props {
   before: WeeklyMentalLoadSnapshot
@@ -19,6 +19,7 @@ interface Props {
  * 只是把家里这阵子"谁在想到、追问、核对、兜底"摊开来给大家看。
  */
 export function MentalLoadDashboard({ before, after, initialView = 'before', bare }: Props) {
+  const members = useAppStore((s) => s.familyMembers)
   const [view, setView] = useState<'before' | 'after'>(initialView)
   const current = view === 'before' ? before : after
   const max = useMemo(
@@ -33,7 +34,9 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
       .sort((a, b) => b.percentage - a.percentage)
     return sorted[0]
   }, [current])
-  const heaviestMember = heaviest ? getMember(heaviest.memberId) : undefined
+  const heaviestMember = heaviest
+    ? members.find((m) => m.id === heaviest.memberId)
+    : undefined
 
   return (
     <div className="space-y-8">
@@ -84,7 +87,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
           .filter((e) => e.score > 0)
           .sort((a, b) => b.score - a.score)
           .map((e, idx) => {
-            const m = getMember(e.memberId)
+            const m = members.find((member) => member.id === e.memberId)
             if (!m) return null
             const width = (e.score / max) * 100
             const isHeaviest = e.memberId === heaviest?.memberId
@@ -119,9 +122,8 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
       </div>
 
       {!bare && (
-        <div className="text-tiny text-ink-500 leading-relaxed pt-6 border-t border-ink-200 max-w-2xl">
-          心力 = 想到 × 3 + 追问 × 2 + 核对 × 2 + 兜底 × 4 + 执行 × 1。
-          兜底的权重最高，因为它是最容易看不到、却最磨人的那部分。
+        <div className="text-tiny text-ink-500 pt-6 border-t border-ink-200 whitespace-nowrap overflow-x-auto">
+          心力 = 想到 × 3 + 追问 × 2 + 核对 × 2 + 兜底 × 4 + 执行 × 1 · 兜底的权重最高，因为它是最容易看不到、却最磨人的那部分
         </div>
       )}
     </div>

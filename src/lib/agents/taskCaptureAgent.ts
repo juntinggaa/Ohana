@@ -9,8 +9,8 @@
  *   2. 失败 / 没 key 时回退到本地关键词匹配
  */
 
-import { getMember } from '../mockData'
-import type { TaskCategory, Urgency } from '../types'
+import { recommendOwner } from './assignmentAgent'
+import type { FamilyMember, TaskCategory, Urgency } from '../types'
 import {
   callDeepSeek,
   callRemoteWithFallback,
@@ -34,13 +34,16 @@ export interface CapturedTask {
   confidence: number
 }
 
+export interface CaptureContext {
+  members?: FamilyMember[]
+  currentUserId?: string
+}
+
 interface Pattern {
   match: RegExp[]
   category: TaskCategory
   urgency: Urgency
   buildTitle: (text: string) => string
-  suggestedOwnerId: string
-  suggestionReason: string
   requiredProof?: string[]
 }
 
@@ -50,8 +53,6 @@ const PATTERNS: Pattern[] = [
     category: 'elderly_care',
     urgency: 'high',
     buildTitle: () => '老人药品补货',
-    suggestedOwnerId: 'bro',
-    suggestionReason: '弟弟与父母同城，到药店或代取处方成本最低。',
     requiredProof: ['药品照片', '小票或订单截图'],
   },
   {
@@ -59,8 +60,6 @@ const PATTERNS: Pattern[] = [
     category: 'medical',
     urgency: 'high',
     buildTitle: () => '医院复诊安排',
-    suggestedOwnerId: 'bro',
-    suggestionReason: '需要现场陪诊和拍处方，弟弟同城最合适。',
     requiredProof: ['处方照片', '缴费单照片'],
   },
   {
@@ -68,8 +67,6 @@ const PATTERNS: Pattern[] = [
     category: 'household_admin',
     urgency: 'medium',
     buildTitle: () => '物业 / 家务行政',
-    suggestedOwnerId: 'zhou',
-    suggestionReason: '居家事务，丈夫在家可对接师傅。',
     requiredProof: ['合格证或完成单据照片'],
   },
   {
@@ -77,8 +74,6 @@ const PATTERNS: Pattern[] = [
     category: 'child_school',
     urgency: 'medium',
     buildTitle: () => '孩子学校任务',
-    suggestedOwnerId: 'zhou',
-    suggestionReason: '伴侣可承接学校任务，减少唐宁连续两段独自承担。',
     requiredProof: ['完成现场照片'],
   },
   {
@@ -86,8 +81,6 @@ const PATTERNS: Pattern[] = [
     category: 'reimbursement',
     urgency: 'low',
     buildTitle: () => '票据 / 报销整理',
-    suggestedOwnerId: 'tangning',
-    suggestionReason: '集中在周三晚处理，避免散落到日常。',
   },
 ]
 
@@ -97,47 +90,131 @@ function detectUrgency(text: string, base: Urgency): Urgency {
   return base
 }
 
-function detectOriginatorId(speakerId?: string): string {
-  if (!speakerId || speakerId === 'system') return 'system'
-  if (getMember(speakerId)) return speakerId
-  return 'system'
+function findMemberBySpeakerLabel(
+  label: string,
+  members: FamilyMember[] = [],
+): FamilyMember | undefined {
+  const clean = label.replace(/\[[^\]]+\]/g, '').trim()
+  return members.find((m) => {
+    const relation = m.relation.replace('我自己', '').trim()
+    return (
+      clean.includes(m.name) ||
+      (relation.length > 0 && clean.includes(relation))
+    )
+  })
+}
+
+function detectOriginatorId(label: string, context: CaptureContext): string {
+  const member = findMemberBySpeakerLabel(label, context.members)
+  if (member) return member.id
+  return context.currentUserId ?? 'system'
+}
+
+function recommendForCapturedTask(
+  category: TaskCategory,
+  title: string,
+  context: CaptureContext,
+) {
+  const members = context.members ?? []
+  if (members.length === 0) return null
+  return recommendOwner({ category, title }, members)
+}
+
+function parseSpeakerLine(line: string): { speakerLabel: string; body: string } {
+  const speakerMatch = line.match(/([^[\]:：]+)[：:]\s*(.*)$/)
+  return {
+    speakerLabel: speakerMatch?.[1]?.trim() ?? '',
+    body: (speakerMatch?.[2] ?? line).trim(),
+  }
+}
+
+function medicineAlreadyOrdered(input: string): boolean {
+  const hasMedicineNeed = /药.{0,8}(快|没|不多|见底)|药快没了/.test(input)
+  const hasOrder = /(我先|已经|已|帮忙|帮).{0,6}下单|下单了|买好了|已买|已经买/.test(input)
+  const hasArrival = /(今天|明天|后天).{0,10}到|到货|送达|签收/.test(input)
+  return hasMedicineNeed && hasOrder && hasArrival
+}
+
+function dueTextFromDeliveryLine(line: string): string | undefined {
+  if (/明天中午前到/.test(line)) return '明天中午前'
+  if (/明天.*到/.test(line)) return '明天'
+  if (/今天.*到/.test(line)) return '今天'
+  return undefined
+}
+
+function receiptConfirmer(context: CaptureContext): FamilyMember | undefined {
+  const members = context.members ?? []
+  return (
+    members.find((m) => /妈妈|母亲/.test(`${m.name} ${m.relation}`)) ??
+    members.find((m) => /爸爸|父亲/.test(`${m.name} ${m.relation}`))
+  )
+}
+
+function isMedicationReceiptTask(title: string, matchedLine?: string, explanation?: string): boolean {
+  return /确认.*药.*(收到|送达|签收)|药.*(收到|送达|签收)/.test(
+    `${title} ${matchedLine ?? ''} ${explanation ?? ''}`,
+  )
 }
 
 /**
  * 本地确定性识别 —— 没 key 或远程挂掉时使用。
  */
-export function captureTasksFromMessages(input: string): CapturedTask[] {
+export function captureTasksFromMessages(
+  input: string,
+  context: CaptureContext = {},
+): CapturedTask[] {
   const lines = input
     .split(/\n+/)
     .map((l) => l.trim())
     .filter(Boolean)
 
   const results: CapturedTask[] = []
+  const hasMedicineReceiptOnly = medicineAlreadyOrdered(input)
+
+  if (hasMedicineReceiptOnly) {
+    const orderIdx = lines.findIndex((line) => /下单|买好|到货|送达|签收/.test(line))
+    const matchedLine = lines[orderIdx] ?? lines.find((line) => /药/.test(line)) ?? input
+    const { speakerLabel } = parseSpeakerLine(matchedLine)
+    const confirmer = receiptConfirmer(context)
+    results.push({
+      id: `cap-${Math.max(orderIdx, 0)}-elderly_care-receipt`,
+      title: '确认爸爸降压药已收到',
+      category: 'elderly_care',
+      urgency: 'medium',
+      originatorId: detectOriginatorId(speakerLabel, context),
+      suggestedOwnerId: confirmer?.id,
+      suggestionReason: confirmer
+        ? `唐宁已经下单，不需要再派弟弟买药；${confirmer.name}在家确认收到并拍照反馈就好。`
+        : '唐宁已经下单，当前只需要确认药送到父母手上。',
+      requiredProof: ['药品照片或签收截图'],
+      aiExplanation:
+        '原本的补货风险已经被唐宁下单处理，现在剩下的是到货确认：药有没有按时送到、是否放到父母手上。',
+      dueDateText: dueTextFromDeliveryLine(matchedLine),
+      matchedLine,
+      matchedKeywords: ['药快没了', '下单', '到'],
+      confidence: 0.92,
+    })
+  }
 
   lines.forEach((line, idx) => {
-    const speakerMatch = line.match(/([^[\]:：]+)[：:]\s*(.*)$/)
-    const speakerLabel = speakerMatch?.[1]?.trim() ?? ''
-    const body = (speakerMatch?.[2] ?? line).trim()
+    const { speakerLabel, body } = parseSpeakerLine(line)
 
     PATTERNS.forEach((p) => {
       const matched = p.match.filter((re) => re.test(body))
       if (matched.length === 0) return
+      if (hasMedicineReceiptOnly && p.category === 'elderly_care' && /药/.test(body)) return
       const urgency = detectUrgency(body, p.urgency)
-      const speakerId =
-        speakerLabel === '妈妈' ? 'mom'
-          : speakerLabel === '弟弟' ? 'bro'
-            : speakerLabel === '唐宁' ? 'tangning'
-              : speakerLabel === '周勉' ? 'zhou'
-                : 'system'
+      const title = p.buildTitle(body)
+      const recommendation = recommendForCapturedTask(p.category, title, context)
 
       results.push({
         id: `cap-${idx}-${p.category}`,
-        title: p.buildTitle(body),
+        title,
         category: p.category,
         urgency,
-        originatorId: detectOriginatorId(speakerId),
-        suggestedOwnerId: p.suggestedOwnerId,
-        suggestionReason: p.suggestionReason,
+        originatorId: detectOriginatorId(speakerLabel, context),
+        suggestedOwnerId: recommendation?.ownerId,
+        suggestionReason: recommendation?.reason,
         requiredProof: p.requiredProof,
         aiExplanation: `命中关键词：${matched.map((r) => r.source).join('、')}。`,
         matchedLine: line,
@@ -160,12 +237,23 @@ export function captureTasksFromMessages(input: string): CapturedTask[] {
 /* 远程 · DeepSeek                                                            */
 /* -------------------------------------------------------------------------- */
 
-const SYSTEM_PROMPT = `你是「后台审计」的家庭任务识别 Agent。
+function buildSystemPrompt(context: CaptureContext): string {
+  const members = context.members ?? []
+  const memberList =
+    members.length > 0
+      ? members
+          .map((m) => {
+            const bits = [m.relation, m.city, m.capacity, ...(m.traits ?? [])].filter(Boolean)
+            return `- ${m.id} · ${m.name}${bits.length ? `（${bits.join(' / ')}）` : ''}`
+          })
+          .join('\n')
+      : '- 当前没有固定成员；suggestedOwnerId 可以留空。'
+
+  return `你是「欧哈娜 Ohana」的家庭任务识别 Agent。
 
 # 服务对象
-夹心层照护者（典型如 36 岁的唐宁）—— 上有需要复诊和配药的老人、下有需要临时接送或交手工的孩子、中间还有伴侣和工作。
-她不需要别人帮她记得"做饭"和"送孩子上学"，那些她和家里都有自己的节奏。
-她真正会在凌晨三点醒来想起的，是那些 **没在日历上、却漏了就出事** 的事。
+一个真实家庭。不要套用任何示例家庭、固定姓名或固定角色。
+你的目标是把散落在家庭群、医院提醒、学校通知、物业短信里的信息，整理成少量真正需要被接住的事。
 
 # 范围 · 我们只识别哪种任务
 我们只识别 **一次性、有截止、有完成证明** 的"episodic"任务。
@@ -176,7 +264,7 @@ const SYSTEM_PROMPT = `你是「后台审计」的家庭任务识别 Agent。
 - 临时学校通知（家长会、亲子手工、临时假）
 - 物业 / 行政（年检、续费、更新证件）
 - 报销 / 票据整理
-- 偶发的家人请求（妈妈说血压表电池没了 / 老家亲戚要寄药）
+- 偶发的家人请求（药快没了 / 血压表电池没了 / 老家亲戚要寄药）
 
 ❌ **绝对不要识别为任务**（这些是 routine，不在我们的范围）：
 - 每天做饭 / 早饭午饭晚饭 / 煮汤
@@ -196,6 +284,10 @@ const SYSTEM_PROMPT = `你是「后台审计」的家庭任务识别 Agent。
 - 一句随口的"你爸药快没了"是任务（即使没人说"请做 X"），分类 elderly_care，紧急 high。
 - "收到 / 好的 / ok / 嗯" 这种回复 **不算正式承接**，相关任务标记为 "缺截止 + 缺证明"。
 - 不要因为有人回复"收到"就跳过这个任务 —— 那种回复正是问题本身。
+- 如果同一段消息里先说"药快没了"，后面又说"我先/已经下单了，明天...到"，说明买药动作已完成：
+  - 不要输出"老人药品补货"；
+  - 不要推荐弟弟去买药；
+  - 只输出一个"确认爸爸降压药已收到/送达"类任务，suggestedOwnerId 优先给在家能拍照确认的妈妈/老人，不确定可留空。
 
 # 分类（固定枚举）
 elderly_care     · 老人照护（药品、血压、复诊等）
@@ -208,25 +300,28 @@ general_family   · 偶发家事（不是 routine 的那种）
 # 紧急程度
 urgency: low / medium / high
 
-# 推荐执行人（固定 ID）
-- tangning · 唐宁主用户，本周心智负担已高，**尽量不要默认派给她**
-- zhou     · 周勉（丈夫，与唐宁同城上海，处理家中事务）
-- bro      · 弟弟（与父母同城南京，处理老人现场事务）
-- mom      · 妈妈
-- dad      · 爸爸
+# 可用家庭成员（suggestedOwnerId 只能从这里选）
+${memberList}
+
+推荐执行人规则：
+- 只能使用上面列出的 id；不确定就留空。
+- 医疗 / 老人现场事务：优先推荐与被照护者同城、能跑腿/陪诊/拍照的人。
+- 孩子学校事务：优先推荐与孩子或学校同城、日历可控的人。
+- 家务行政：优先推荐能对接师傅、日历可靠、与住处同城的人。
+- 不要把任务默认推给一个固定主用户；要根据真实成员资料判断。
 
 # 输出 · 严格 JSON
 {
   "tasks": [
     {
-      "title": "爸爸降压药补货",
+      "title": "老人药品补货",
       "category": "elderly_care",
       "urgency": "high",
       "dueDateText": "明天中午前",
-      "suggestedOwnerId": "bro",
-      "suggestionReason": "弟弟同城，可线下取药",
+      "suggestedOwnerId": "某个成员 id 或留空",
+      "suggestionReason": "说明为什么这个人更合适",
       "requiredProof": ["药品照片", "订单截图"],
-      "matchedLine": "妈妈：你爸药快没了。",
+      "matchedLine": "原始句子",
       "aiExplanation": "一句随口的话，但药不能断；同时要求截止时间 + 证明",
       "confidence": 0.92
     }
@@ -236,41 +331,73 @@ urgency: low / medium / high
 如果文本里只有 routine（做饭、接送、闲聊），返回 { "tasks": [] }。
 不要为了凑数而把日常包装成任务。
 不要添加任何 JSON 之外的解释文字。`
+}
 
-async function callDeepSeekForCapture(input: string): Promise<CapturedTask[]> {
+async function callDeepSeekForCapture(
+  input: string,
+  context: CaptureContext,
+): Promise<CapturedTask[]> {
   const raw = await callDeepSeek({
-    system: SYSTEM_PROMPT,
+    system: buildSystemPrompt(context),
     user: input,
     json: true,
     temperature: 0.2,
   })
   const parsed = extractJson<{ tasks: Partial<CapturedTask>[] }>(raw)
   if (!parsed?.tasks?.length) return []
+  const validOwnerIds = new Set((context.members ?? []).map((m) => m.id))
+  const forceMedicineReceipt = medicineAlreadyOrdered(input)
   return parsed.tasks.map(
-    (t, idx): CapturedTask => ({
-      id: `ds-${idx}-${Date.now()}`,
-      title: t.title ?? '未命名任务',
-      category: (t.category as TaskCategory) ?? 'general_family',
-      urgency: (t.urgency as Urgency) ?? 'medium',
-      originatorId: t.originatorId ?? 'system',
-      suggestedOwnerId: t.suggestedOwnerId,
-      suggestionReason: t.suggestionReason,
-      requiredProof: t.requiredProof ?? [],
-      aiExplanation: t.aiExplanation,
-      dueDateText: t.dueDateText,
-      matchedLine: t.matchedLine ?? '',
-      matchedKeywords: [],
-      confidence: typeof t.confidence === 'number' ? t.confidence : 0.85,
-    }),
+    (t, idx): CapturedTask => {
+      const category = (t.category as TaskCategory) ?? 'general_family'
+      const matchedLine = t.matchedLine ?? ''
+      const shouldNormalizeMedicineReceipt =
+        forceMedicineReceipt && category === 'elderly_care' && /药|补货/.test(`${t.title ?? ''} ${matchedLine}`)
+      const title = shouldNormalizeMedicineReceipt ? '确认爸爸降压药已收到' : (t.title ?? '未命名任务')
+      const confirmer = shouldNormalizeMedicineReceipt ? receiptConfirmer(context) : undefined
+      const fallbackReco = recommendForCapturedTask(category, title, context)
+      const avoidAutoOwner = isMedicationReceiptTask(title, matchedLine, t.aiExplanation)
+      const remoteOwner =
+        !shouldNormalizeMedicineReceipt && t.suggestedOwnerId && validOwnerIds.has(t.suggestedOwnerId)
+          ? t.suggestedOwnerId
+          : undefined
+      return {
+        id: `ds-${idx}-${Date.now()}`,
+        title,
+        category,
+        urgency: (t.urgency as Urgency) ?? 'medium',
+        originatorId:
+          t.originatorId && validOwnerIds.has(t.originatorId)
+            ? t.originatorId
+            : context.currentUserId ?? 'system',
+        suggestedOwnerId: remoteOwner ?? confirmer?.id ?? (avoidAutoOwner ? undefined : fallbackReco?.ownerId),
+        suggestionReason:
+          shouldNormalizeMedicineReceipt
+            ? confirmer
+              ? `唐宁已经下单，不需要再派弟弟买药；${confirmer.name}在家确认收到并拍照反馈就好。`
+              : '唐宁已经下单，当前只需要确认药送到父母手上。'
+            : t.suggestionReason ?? (avoidAutoOwner ? undefined : fallbackReco?.reason),
+        requiredProof: shouldNormalizeMedicineReceipt ? ['药品照片或签收截图'] : (t.requiredProof ?? []),
+        aiExplanation:
+          shouldNormalizeMedicineReceipt
+            ? '唐宁已经下单，当前只需要确认药送到父母手上。'
+            : t.aiExplanation,
+        dueDateText: t.dueDateText ?? (shouldNormalizeMedicineReceipt ? dueTextFromDeliveryLine(matchedLine) : undefined),
+        matchedLine,
+        matchedKeywords: [],
+        confidence: typeof t.confidence === 'number' ? t.confidence : 0.85,
+      }
+    },
   )
 }
 
 export async function analyzeFamilyMessages(
   input: string,
+  context: CaptureContext = {},
 ): Promise<LLMResponse<CapturedTask[]>> {
   return callRemoteWithFallback({
-    fallback: captureTasksFromMessages(input),
+    fallback: captureTasksFromMessages(input, context),
     mockNote: '本地关键词识别 · 没有可用 LLM',
-    remote: () => callDeepSeekForCapture(input),
+    remote: () => callDeepSeekForCapture(input, context),
   })
 }

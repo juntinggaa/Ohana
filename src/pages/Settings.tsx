@@ -97,7 +97,7 @@ export function SettingsPage() {
           <div className="space-y-2 text-small mb-6">
             <Row label="当前任务数" value={tasks.length} />
             <Row label="已承接记录" value={Object.keys(accepted).length} />
-            <Row label="存储位置" value="浏览器 localStorage · 键 backstage-audit:v6" />
+            <Row label="存储位置" value="浏览器 localStorage · 键 ohana:v1" />
           </div>
           <div className="flex flex-wrap gap-3">
             <button className="btn-outline" onClick={handleReset}>

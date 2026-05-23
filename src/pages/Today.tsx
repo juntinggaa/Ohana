@@ -17,9 +17,15 @@ import { PageHeader } from '@/components/PageHeader'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskDetailModal } from '@/components/TaskDetailModal'
 import { useAppStore } from '@/lib/store'
+import {
+  isTaskAcceptedByUser,
+  isTaskAssignedToUser,
+  isTaskAwaitingUserConfirmation,
+  isTaskDraft,
+} from '@/lib/status'
 import { useIsSimpleMode, useUiMode } from '@/lib/useUiMode'
 import type { CareTask, TaskCategory } from '@/lib/types'
-import { cn, formatDueDate } from '@/lib/utils'
+import { cn, dueDateRank, formatDueDate } from '@/lib/utils'
 
 type View = 'mine' | 'all'
 
@@ -32,24 +38,37 @@ function isDueSoon(t: CareTask): boolean {
   return /(今天|明天|周一|本周|今晚)/.test(txt)
 }
 
-function isMine(t: CareTask, userId: string): boolean {
-  if (t.executorId === userId) return true
-  if (t.subtasks.some((s) => s.ownerId === userId)) return true
-  return false
+function isDueToday(t: CareTask): boolean {
+  if (!t.dueDate) {
+    return /^今天|今晚/.test(t.dueDateText ?? '')
+  }
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(t.dueDate + 'T00:00:00')
+  return due.getTime() === today.getTime()
+}
+
+function isDueLater(t: CareTask): boolean {
+  if (!t.dueDate) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const due = new Date(t.dueDate + 'T00:00:00')
+  return due.getTime() > today.getTime()
 }
 
 function isAwaitingMyConfirm(t: CareTask, userId: string): boolean {
-  if (t.status === 'completed' || t.status === 'accepted') return false
-  return (
-    t.suggestedOwnerId === userId ||
-    t.subtasks.some((s) => s.suggestedOwnerId === userId && !s.ownerId)
-  )
+  return isTaskAwaitingUserConfirmation(t, userId)
+}
+
+/** 待我分配 · 我是发起人且任务还在 draft 状态 */
+function isWaitingForMyAllocation(t: CareTask, userId: string): boolean {
+  return t.originatorId === userId && isTaskDraft(t)
 }
 
 function isRelatedToUser(t: CareTask, userId: string): boolean {
   if (t.originatorId === userId) return true
-  if (t.executorId === userId) return true
-  if (t.suggestedOwnerId === userId) return true
+  if (isTaskAssignedToUser(t, userId)) return true
+  if (isTaskAcceptedByUser(t, userId)) return true
   if (t.verifierId === userId) return true
   if (t.subtasks.some((s) => s.ownerId === userId || s.suggestedOwnerId === userId)) return true
   return false
@@ -57,13 +76,13 @@ function isRelatedToUser(t: CareTask, userId: string): boolean {
 
 function couldHelp(t: CareTask, userTraits: string[], userId: string): boolean {
   if (t.status === 'accepted' || t.status === 'completed' || t.status === 'in_progress') return false
-  if (t.executorId === userId) return false
-  if (t.suggestedOwnerId === userId) return false
+  if (isTaskDraft(t)) return false                          // 还没分配 · 不出现在别人视图
+  if (isTaskAssignedToUser(t, userId)) return false
   const traitsHints: Record<CareTask['category'], string[]> = {
-    elderly_care: ['同城父母', '可跑腿', '会陪诊', '能买药'],
-    medical: ['同城父母', '会陪诊'],
-    child_school: ['同城唐宁', '能拍照上传', '家务行政'],
-    household_admin: ['家务行政', '日历可靠', '可对接师傅', '同城唐宁'],
+    elderly_care: ['同城父母', '同城老人', '可跑腿', '会陪诊', '能买药'],
+    medical: ['同城父母', '同城老人', '会陪诊', '可跑腿'],
+    child_school: ['同城孩子', '同城学校', '能拍照上传', '家务行政'],
+    household_admin: ['家务行政', '日历可靠', '可对接师傅', '同城家中'],
     reimbursement: ['票据整理', '统筹'],
     general_family: ['能拍照上传'],
   }
@@ -172,7 +191,6 @@ export function TodayPage() {
         <MineView
           tasks={tasks}
           currentUserId={currentUserId}
-          myTraits={me?.traits ?? []}
           mode={mode}
           isSimple={isSimple}
           activeId={active?.id}
@@ -199,7 +217,6 @@ export function TodayPage() {
 function MineView({
   tasks,
   currentUserId,
-  myTraits,
   mode,
   isSimple,
   activeId,
@@ -207,36 +224,64 @@ function MineView({
 }: {
   tasks: CareTask[]
   currentUserId: string
-  myTraits: string[]
   mode: ReturnType<typeof useUiMode>
   isSimple: boolean
   activeId?: string
   onOpen: (t: CareTask) => void
 }) {
-  const myDoSoon = useMemo(
+  // 今天要做 · 我已经确认承接的事 + 今天截止
+  const myToday = useMemo(
     () =>
-      tasks.filter(
-        (t) =>
-          t.status !== 'completed' &&
-          isMine(t, currentUserId) &&
-          isDueSoon(t),
-      ),
+      tasks
+        .filter(
+          (t) =>
+            t.status !== 'completed' &&
+            isTaskAcceptedByUser(t, currentUserId) &&
+            isDueToday(t),
+        )
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
     [tasks, currentUserId],
   )
 
+  // 接下来要做 · 我已经确认承接的事 + 未来日期
+  const myUpcoming = useMemo(
+    () =>
+      tasks
+        .filter(
+          (t) =>
+            t.status !== 'completed' &&
+            isTaskAcceptedByUser(t, currentUserId) &&
+            isDueLater(t),
+        )
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
+    [tasks, currentUserId],
+  )
+
+  // 待确认 · 别人派给我，等我点"我接手"
   const waitingOnMe = useMemo(
-    () => tasks.filter((t) => isAwaitingMyConfirm(t, currentUserId)),
+    () =>
+      tasks
+        .filter((t) => isAwaitingMyConfirm(t, currentUserId))
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
     [tasks, currentUserId],
   )
 
-  const couldHelpList = useMemo(
-    () => tasks.filter((t) => couldHelp(t, myTraits, currentUserId)).slice(0, 4),
-    [tasks, myTraits, currentUserId],
+  // 待分配 · 我发起的、还没派出去的事
+  const myDrafts = useMemo(
+    () =>
+      tasks
+        .filter((t) => isWaitingForMyAllocation(t, currentUserId))
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
+    [tasks, currentUserId],
   )
 
   // 老人版 · 极简 · 一栏一张大卡片，其他什么都不显示
   if (mode === 'elder') {
-    const allToday = [...myDoSoon, ...waitingOnMe]
+    const allToday = [...myToday, ...waitingOnMe]
     return (
       <div className="max-w-3xl mx-auto px-8 lg:px-12 pb-24">
         {allToday.length === 0 ? (
@@ -259,21 +304,26 @@ function MineView({
     )
   }
 
-  // 标准模式
+  // 标准模式 · 四段：今天要做 / 接下来要做 / 待分配 / 待确认
+  const isEmpty =
+    myToday.length === 0 &&
+    myUpcoming.length === 0 &&
+    waitingOnMe.length === 0 &&
+    myDrafts.length === 0
+
   return (
     <div className="max-w-5xl mx-auto px-8 lg:px-12 pb-20 space-y-14">
+      {/* 今天要做 */}
       <section className="border-t border-ink-200 pt-8">
         <div className="flex items-baseline justify-between mb-5">
-          <h2 className="font-serif text-h3 text-ink-900">我今天要做</h2>
-          <span className="text-tiny text-ink-500">{myDoSoon.length} 件</span>
+          <h2 className="font-serif text-h3 text-ink-900">今天要做的事</h2>
+          <span className="text-tiny text-ink-500">{myToday.length} 件</span>
         </div>
-        {myDoSoon.length === 0 ? (
-          <p className="text-small text-ink-500 italic">
-            今天没有临近截止的事。可以喘口气。
-          </p>
+        {myToday.length === 0 ? (
+          <p className="text-small text-ink-500 italic">今天没有临近截止的事。</p>
         ) : (
-          <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
-            {myDoSoon.map((t) => (
+          <div className="space-y-3">
+            {myToday.map((t) => (
               <TaskCard
                 key={t.id}
                 task={t}
@@ -286,16 +336,67 @@ function MineView({
         )}
       </section>
 
+      {/* 接下来要做 */}
+      {myUpcoming.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-serif text-h3 text-ink-900">接下来要做</h2>
+            <span className="text-tiny text-ink-500">{myUpcoming.length} 件</span>
+          </div>
+          <div className="space-y-3">
+            {myUpcoming.map((t) => (
+              <TaskCard
+                key={t.id}
+                task={t}
+                simpleMode={isSimple}
+                onClick={() => onOpen(t)}
+                active={activeId === t.id}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 待分配 · 我发起的、还没派出去的事 */}
+      {myDrafts.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
+              <Bell size={16} className="text-rouge-500" />
+              待分配
+            </h2>
+            <span className="text-tiny text-ink-500">{myDrafts.length} 件</span>
+          </div>
+          <p className="text-tiny text-ink-500 mb-4">
+            你发起、还没派给别人的事。打开 → 点「全部按 AI 推荐指派」就好。其他家人现在还看不到。
+          </p>
+          <div className="space-y-3">
+            {myDrafts.map((t) => (
+              <TaskCard
+                key={t.id}
+                task={t}
+                simpleMode={isSimple}
+                onClick={() => onOpen(t)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* 待确认 · 别人派给我，等我点"我接手" */}
       {waitingOnMe.length > 0 && (
         <section>
           <div className="flex items-baseline justify-between mb-5">
             <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
               <Bell size={16} className="text-rouge-500" />
-              别人在等我确认
+              待确认
             </h2>
             <span className="text-tiny text-ink-500">{waitingOnMe.length} 件</span>
           </div>
-          <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
+          <p className="text-tiny text-ink-500 mb-4">
+            别人派给你的事，等你点「我接手」。
+          </p>
+          <div className="space-y-3">
             {waitingOnMe.map((t) => (
               <TaskCard
                 key={t.id}
@@ -308,38 +409,7 @@ function MineView({
         </section>
       )}
 
-      {couldHelpList.length > 0 && (
-        <section className="border-t border-ink-200 pt-8">
-          <div className="flex items-baseline justify-between mb-5">
-            <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
-              <HelpingHand size={16} className="text-moss-500" />
-              我可以帮忙的事
-            </h2>
-            <Link
-              to="/overview"
-              className="text-tiny text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
-            >
-              打开家庭总览
-              <ArrowRight size={11} />
-            </Link>
-          </div>
-          <p className="text-tiny text-ink-500 mb-4">
-            这些事还没人接住，但根据你的情况（{myTraits.slice(0, 3).join(' / ') || '在家时间或位置'}）你可能合适。不勉强。
-          </p>
-          <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
-            {couldHelpList.map((t) => (
-              <TaskCard
-                key={t.id}
-                task={t}
-                simpleMode={isSimple}
-                onClick={() => onOpen(t)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {myDoSoon.length === 0 && waitingOnMe.length === 0 && couldHelpList.length === 0 && (
+      {isEmpty && (
         <div className="border-t border-ink-200 pt-12 text-center text-small text-ink-500">
           你这边今天没什么要紧的事。
           <div className="mt-2">
@@ -402,8 +472,8 @@ function AllView({
   const [tab, setTab] = useState<TaskCategory | 'all'>('all')
 
   const filtered = useMemo(() => {
-    if (tab === 'all') return tasks
-    return tasks.filter((t) => t.category === tab)
+    const list = tab === 'all' ? tasks : tasks.filter((t) => t.category === tab)
+    return list.slice().sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate))
   }, [tasks, tab])
 
   return (
@@ -438,7 +508,7 @@ function AllView({
           这个分类下没有任务
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-x-8 gap-y-6">
+        <div className="space-y-3">
           {filtered.map((t, idx) => (
             <div
               key={t.id}

@@ -10,7 +10,7 @@
  *   - 下周可以怎么分担（来自 CareBalancePanel）
  */
 
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, Inbox as InboxIcon, AlertTriangle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
@@ -20,28 +20,46 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskDetailModal } from '@/components/TaskDetailModal'
 import { OriginatorLabel } from '@/components/OriginatorLabel'
 import { useAppStore } from '@/lib/store'
-import { MENTAL_LOAD_BEFORE } from '@/lib/mockData'
 import { Stat } from '@/components/Stat'
 import { useUiMode } from '@/lib/useUiMode'
 import type { CareTask } from '@/lib/types'
 import { dueDateRank } from '@/lib/utils'
 
+/**
+ * "还没人接住" · 任何尚未被某人正式承接的事
+ *   - detected: AI 刚识别还没分配
+ *   - needs_owner: 没人被指派
+ *   - fallback_risk: 又回到同一个人（保留以防万一）
+ *   - pending_acceptance: 已被指派但还没人点"我接手"
+ */
 function isUnassigned(t: CareTask): boolean {
   return (
+    t.status === 'detected' ||
     t.status === 'needs_owner' ||
     t.status === 'fallback_risk' ||
     t.status === 'pending_acceptance'
   )
 }
 
+/**
+ * "家里这周的重要事项" · 已经在做、临近截止的事
+ *   只挑已承接 / 进行中 / 等证明 —— 跟"还没人接住"完全不重合
+ */
 function isImportantThisWeek(t: CareTask): boolean {
-  if (t.status === 'completed') return false
+  if (
+    t.status !== 'accepted' &&
+    t.status !== 'in_progress' &&
+    t.status !== 'needs_proof'
+  ) {
+    return false
+  }
   return /(今天|明天|周一|本周|今晚)/.test(t.dueDateText ?? '')
 }
 
 export function DashboardPage() {
   const tasks = useAppStore((s) => s.tasks)
   const accepted = useAppStore((s) => s.accepted)
+  const mentalLoadBefore = useAppStore((s) => s.mentalLoadBefore)
   const mentalLoadAfter = useAppStore((s) => s.mentalLoadAfter)
   const mode = useUiMode()
   const [active, setActive] = useState<CareTask | null>(null)
@@ -65,9 +83,9 @@ export function DashboardPage() {
         .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
     [tasks],
   )
-  // 卡片 section 只显示前 N 条；统计数字用全量
-  const importantSoon = importantThisWeek.slice(0, 6)
-  const unassigned = unassignedAll.slice(0, 4)
+  // 与「全部事项」保持一致 · 不再截断
+  const importantSoon = importantThisWeek
+  const unassigned = unassignedAll
 
   const activeFromStore = active ? tasks.find((t) => t.id === active.id) ?? null : null
 
@@ -176,7 +194,7 @@ export function DashboardPage() {
               </div>
             </div>
             <MentalLoadDashboard
-              before={{ label: '本周', entries: MENTAL_LOAD_BEFORE.entries }}
+              before={{ label: '本周', entries: mentalLoadBefore }}
               after={{
                 label: acceptedCount > 0 ? `已分担 ${acceptedCount} 条后` : '若按建议分担',
                 entries: mentalLoadAfter,
@@ -191,24 +209,6 @@ export function DashboardPage() {
         </div>
       </section>
 
-      {/* 更多入口（老人版隐藏） */}
-      {mode !== 'elder' && (
-        <section className="max-w-6xl mx-auto px-8 lg:px-12 py-12 border-t border-ink-200">
-          <div className="eyebrow mb-3">更多入口</div>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/mental-load" className="btn-outline text-tiny">
-              心力分布的细节
-            </Link>
-            <Link to="/memory?mode=paste" className="btn-outline text-tiny">
-              粘聊天给 AI
-            </Link>
-            <Link to="/me?view=all" className="btn-outline text-tiny">
-              全部事项
-            </Link>
-          </div>
-        </section>
-      )}
-
       <TaskDetailModal task={activeFromStore} onClose={() => setActive(null)} />
     </>
   )
@@ -216,21 +216,28 @@ export function DashboardPage() {
 
 function EmptyOverview() {
   const resetToSampleData = useAppStore((s) => s.resetToSampleData)
+  const navigate = useNavigate()
+
+  function openSampleInbox() {
+    resetToSampleData()
+    navigate('/memory?mode=paste')
+  }
+
   return (
     <>
       <PageHeader title="家庭总览" description="家里这周还很安静。" />
       <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-20">
         <div className="border-t border-ink-200 pt-16 text-center max-w-md mx-auto">
           <p className="font-serif text-lead text-ink-500 mb-8">
-            状态已被清空。你可以重新载入示例家庭，也可以直接去收件箱粘贴自己的消息。
+            现在还没有任务。先把聊天交给 AI，任务会从消息里识别出来。
           </p>
           <div className="flex items-center justify-center gap-3">
             <Link to="/memory?mode=paste" className="btn-primary">
               <InboxIcon size={14} />
               粘段群聊给 AI
             </Link>
-            <button className="btn-outline" onClick={resetToSampleData}>
-              载入示例（唐宁家）
+            <button className="btn-outline" onClick={openSampleInbox}>
+              唐宁家示例消息
             </button>
           </div>
         </div>

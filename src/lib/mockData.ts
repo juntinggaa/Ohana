@@ -155,9 +155,18 @@ export const RAW_MESSAGES: RawMessage[] = [
   },
 ]
 
-export const FAMILY_CHAT_RAW = RAW_MESSAGES.map(
-  (m) => `[${m.channel}] ${m.timestamp} · ${m.speakerLabel}：${m.body}`,
-).join('\n')
+export const FAMILY_CHAT_RAW = [
+  '23 may 2026',
+  '[家庭群] 昨天 17:08 · 妈妈：你爸药快没了。',
+  '[家庭群] 昨天 17:11 · 弟弟：收到。',
+  '[家庭群] 昨天 22:46 · 唐宁：我先下单了，明天中午前到。',
+  '[家庭群] 昨天 22:51 · 妈妈：你怎么还没睡？别管了，早点睡。',
+  '[幼儿园群] 昨天 21:20 · 幼儿园老师：明天请家长带孩子作品到班级门口拍照。',
+  '24 may 2026',
+  '[物业通知] 今天 09:02 · 物业：燃气年检请于本周内预约。',
+  '[医院提醒] 今天 10:14 · 医院：高血压复诊预约：周一 9:20，请携带医保卡、检查单、血压记录本。前一晚 22:00 后空腹。',
+  '[私聊] 今天 11:30 · 妈妈：你爸今天早上血压 148/92，要紧吗？',
+].join('\n')
 
 /* -------------------------------------------------------------------------- */
 /* 任务示例 · 用于"识别后"的展示                                              */
@@ -210,14 +219,14 @@ export const SAMPLE_TASKS: CareTask[] = [
     status: 'needs_owner',
     urgency: 'high',
     subtasks: [
-      { id: 's10', title: '前一晚 22:00 后空腹', phase: 'before', completed: false, ownerId: 'mom', suggestedOwnerId: 'mom' },
+      { id: 's10', title: '前一晚 22:00 后空腹', phase: 'before', completed: false, suggestedOwnerId: 'mom' },
       { id: 's11', title: '早 7:40 出门', phase: 'before', completed: false },
-      { id: 's12', title: '8:20 医院门口接老人', phase: 'before', completed: false, ownerId: 'bro' },
-      { id: 's13', title: '携带医保卡、蓝色文件袋、血压记录本', phase: 'before', completed: false },
-      { id: 's14', title: '问医生：近一周血压、是否调药、下次复诊', phase: 'during', completed: false, ownerId: 'bro' },
-      { id: 's15', title: '处方与缴费单拍照发群', phase: 'after', completed: false, ownerId: 'bro' },
-      { id: 's16', title: '若调药，妈妈语音说明、弟弟拍药盒', phase: 'after', completed: false },
-      { id: 's17', title: '报销整理（周三晚）', phase: 'after', completed: false, ownerId: 'tangning' },
+      { id: 's12', title: '8:20 医院门口接老人', phase: 'before', completed: false, suggestedOwnerId: 'bro' },
+      { id: 's13', title: '携带医保卡、蓝色文件袋、血压记录本', phase: 'before', completed: false, suggestedOwnerId: 'bro' },
+      { id: 's14', title: '问医生：近一周血压、是否调药、下次复诊', phase: 'during', completed: false, suggestedOwnerId: 'bro' },
+      { id: 's15', title: '处方与缴费单拍照发群', phase: 'after', completed: false, suggestedOwnerId: 'bro' },
+      { id: 's16', title: '若调药，妈妈语音说明、弟弟拍药盒', phase: 'after', completed: false, suggestedOwnerId: 'mom' },
+      { id: 's17', title: '报销整理（周三晚）', phase: 'after', completed: false, suggestedOwnerId: 'tangning' },
     ],
     requiredProof: ['处方照片', '缴费单照片', '调药后的药盒照片'],
     aiExplanation:

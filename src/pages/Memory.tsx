@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Avatar } from '@/components/Avatar'
 import { MemberPill } from '@/components/MemberPill'
 import { FamilyChatInput } from '@/components/FamilyChatInput'
-import { useAppStore } from '@/lib/store'
+import { buildMentalLoadPatch, useAppStore } from '@/lib/store'
 import { useIsElder } from '@/lib/useUiMode'
 import { processFamilyMemoryMessage } from '@/lib/agents/familyMemoryAgent'
 import { generateWorkflow } from '@/lib/agents/careWorkflowAgent'
@@ -20,12 +20,12 @@ import { cn } from '@/lib/utils'
 type Mode = 'chat' | 'paste'
 
 const QUICK_PROMPTS = [
-  '我想新增一个任务',
-  '我记得一件事',
-  '我不知道要怎么做',
+  '药快没了，帮忙跟进',
+  '我今天血压正常',
+  '我不知道复诊要带什么',
   '我这周有空，可以帮忙',
-  '帮我重新分配任务',
-  '提醒家人不要忘记',
+  '我这周不方便接新任务',
+  '这件事能不能重新分配',
 ]
 
 const INTENT_LABEL: Record<FamilyMemoryEntry['intent'], string> = {
@@ -67,7 +67,7 @@ export function MemoryPage() {
         description={
           isElder
             ? '想到什么 · 说一句就行 · AI 会帮你记下来或转告家人'
-            : '家里散落的信息 · 都可以告诉 AI · 不必非要建任务'
+            : '说一句家里的变化 · AI 判断要记忆、建任务、更新可用性，还是请家人确认'
         }
       />
 
@@ -102,7 +102,7 @@ export function MemoryPage() {
           </div>
           <p className="text-tiny text-ink-500 mt-2 max-w-xl leading-snug">
             {mode === 'chat'
-              ? '一句一句说就行 · AI 帮你整理成任务 / 提醒 / 责任建议。'
+              ? '目标很简单：把一句模糊的话变成清楚的下一步。不是每句话都要建任务；能只记下的，就只记下。'
               : '把家庭群、医院提醒、学校通知整段贴进来 · AI 自动识别成多个任务。'}
           </p>
         </div>
@@ -127,6 +127,7 @@ function ChatMode() {
   const setCurrentUser = useAppStore((s) => s.setCurrentUser)
   const pushToast = useAppStore((s) => s.pushToast)
   const pushNotification = useAppStore((s) => s.pushNotification)
+  const addTrait = useAppStore((s) => s.addTrait)
   const isElder = useIsElder()
 
   const [text, setText] = useState('')
@@ -136,6 +137,9 @@ function ChatMode() {
     () => members.find((m) => m.id === currentUserId) ?? members[0],
     [members, currentUserId],
   )
+
+  // 用户用自己的家（不是示例唐宁家） · 隐掉一些 Tang Ning 专属的示例 chip
+  const isSampleFamily = members.some((m) => m.id === 'tangning')
 
   function handleSend(value?: string) {
     const raw = (value ?? text).trim()
@@ -217,7 +221,13 @@ function ChatMode() {
         requiredProof: wf.requiredProof,
         aiExplanation: payload.aiExplanation,
       }
-      useAppStore.setState((s) => ({ tasks: [newTask, ...s.tasks] }))
+      useAppStore.setState((s) => {
+        const tasks = [newTask, ...s.tasks]
+        return {
+          tasks,
+          ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
+        }
+      })
 
       // 创建任务的同时，自动通知建议执行人（如果有）
       if (payload.suggestedOwnerId && payload.suggestedOwnerId !== currentUserId) {
@@ -246,6 +256,11 @@ function ChatMode() {
       return
     }
     if (action.actionType === 'assign_owner') {
+      const raw = String((action.payload as { rawMessage?: unknown } | undefined)?.rawMessage ?? '')
+      addTrait(
+        entry.speakerId,
+        /没空|不方便|不在|出差/.test(raw) ? '本周不方便' : '本周可帮忙',
+      )
       resolveEntry(entry.id, 'noted')
       pushToast('已把这段可用时间记到家人档案', 'success')
       return
@@ -276,8 +291,15 @@ function ChatMode() {
       <div className="border-t border-ink-200 pt-8 space-y-8 min-w-0">
         {/* 历史记录 */}
         {entries.length === 0 ? (
-          <div className="text-small text-ink-500 italic py-4">
-            还没有人说话。试试下面的快捷示例。
+          <div className="border-l-2 border-ink-200 bg-paper-50 px-5 py-4">
+            <div className="eyebrow mb-2">这个入口做什么</div>
+            <p className="text-small text-ink-600 leading-relaxed">
+              说一句家里的事。AI 会先判断它属于哪一种：
+              <span className="text-ink-900"> 需要分配的任务 </span>/
+              <span className="text-ink-900"> 只要留档的家庭记忆 </span>/
+              <span className="text-ink-900"> 某个人的可用时间 </span>/
+              <span className="text-ink-900"> 需要家人回答的问题</span>。
+            </p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -337,43 +359,48 @@ function ChatMode() {
                   </button>
                 ))}
               </div>
-              <div className="text-tiny text-ink-500 mb-2">
-                示范：把家庭群里的一句话粘进来，看 AI 怎么拆。
-              </div>
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                  onClick={() =>
-                    handleSend('你爸最近早上血压有点高，但是他说没事。')
-                  }
-                  className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
-                >
-                  示例 · 妈妈说血压
-                </button>
-                <button
-                  onClick={() =>
-                    handleSend('我周一上午可以陪爸去医院，但我不知道要带什么。')
-                  }
-                  className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
-                >
-                  示例 · 弟弟问要带什么
-                </button>
-                <button
-                  onClick={() =>
-                    handleSend('我这周五下午在家，可以处理燃气年检。')
-                  }
-                  className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
-                >
-                  示例 · 周勉报可用时间
-                </button>
-                <button
-                  onClick={() =>
-                    handleSend('我最近不想再负责所有父母医疗任务，能不能帮我重新分配？')
-                  }
-                  className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
-                >
-                  示例 · 唐宁要求重新分配
-                </button>
-              </div>
+              {/* 唐宁家示例 chip · 用户自有家庭隐掉 */}
+              {isSampleFamily && (
+                <>
+                  <div className="text-tiny text-ink-500 mb-2">
+                    示范：把家庭群里的一句话粘进来，看 AI 怎么拆。
+                  </div>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <button
+                      onClick={() =>
+                        handleSend('你爸最近早上血压有点高，但是他说没事。')
+                      }
+                      className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
+                    >
+                      示例 · 妈妈说血压
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleSend('我周一上午可以陪爸去医院，但我不知道要带什么。')
+                      }
+                      className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
+                    >
+                      示例 · 弟弟问要带什么
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleSend('我这周五下午在家，可以处理燃气年检。')
+                      }
+                      className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
+                    >
+                      示例 · 周勉报可用时间
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleSend('我最近不想再负责所有父母医疗任务，能不能帮我重新分配？')
+                      }
+                      className="text-tiny border border-rouge-300 px-2.5 py-1 text-rouge-500 hover:bg-rouge-50"
+                    >
+                      示例 · 唐宁要求重新分配
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
@@ -496,6 +523,10 @@ function ChatBubble({
   )
   const isResolved = !!entry.resolution
   const isIgnored = entry.resolution === 'ignored'
+  const isTaskLike =
+    entry.intent === 'new_task' ||
+    entry.intent === 'risk_signal' ||
+    entry.intent === 'redistribution_request'
 
   return (
     <div className={cn('space-y-3', isIgnored && 'opacity-60')}>
@@ -530,7 +561,9 @@ function ChatBubble({
 
             {entry.extractedTitle && (
               <div className="text-small text-ink-700">
-                <span className="text-ink-400 mr-1.5">建议任务：</span>
+                <span className="text-ink-400 mr-1.5">
+                  {isTaskLike ? '建议任务：' : '整理为：'}
+                </span>
                 <span className="font-medium">{entry.extractedTitle}</span>
                 {entry.suggestedDeadline && (
                   <span className="text-ink-500 ml-2">· 截止 {entry.suggestedDeadline}</span>
@@ -634,11 +667,12 @@ function ResolutionChip({ entry }: { entry: FamilyMemoryEntry }) {
 
 function PasteMode() {
   const navigate = useNavigate()
+  const members = useAppStore((s) => s.familyMembers)
   const ingest = useAppStore((s) => s.ingestCapturedTasks)
   const pushToast = useAppStore((s) => s.pushToast)
+  const isSampleFamily = members.some((m) => m.id === 'tangning')
 
   const [captured, setCaptured] = useState<CapturedTask[]>([])
-  const [llmMode, setLlmMode] = useState<'mock' | 'remote' | null>(null)
   const [remoteError, setRemoteError] = useState<string | null>(null)
   const [savedCount, setSavedCount] = useState(0)
 
@@ -657,9 +691,8 @@ function PasteMode() {
     <div className="max-w-6xl mx-auto px-8 lg:px-12 pb-20 grid lg:grid-cols-2 gap-12">
       <div className="border-t border-ink-200 pt-8">
         <FamilyChatInput
-          onCaptured={(tasks, m, err) => {
+          onCaptured={(tasks, _m, err) => {
             setCaptured(tasks)
-            setLlmMode(m)
             setRemoteError(err ?? null)
             setSavedCount(0)
           }}
@@ -671,16 +704,6 @@ function PasteMode() {
           <div className="eyebrow">
             {captured.length > 0 ? `识别到 ${captured.length} 条` : 'AI 识别结果'}
           </div>
-          {llmMode && (
-            <span
-              className={cn(
-                'text-tiny',
-                llmMode === 'remote' ? 'text-moss-500' : 'text-ink-500',
-              )}
-            >
-              {llmMode === 'remote' ? 'DeepSeek 实时' : '本地逻辑'}
-            </span>
-          )}
         </div>
 
         {remoteError && (
@@ -695,7 +718,9 @@ function PasteMode() {
             <p className="text-small text-ink-500 max-w-xs mx-auto leading-relaxed">
               点左边的「AI 识别任务」按钮。
               <br />
-              可以用示例消息，也可以粘贴你自己的家庭群。
+              {isSampleFamily
+                ? '可以用示例消息，也可以粘贴你自己的家庭群。'
+                : '粘贴你自己的家庭群，AI 会按当前家人来推荐负责人。'}
             </p>
           </div>
         )}
@@ -709,13 +734,8 @@ function PasteMode() {
                   className="border-b border-ink-200 py-5 animate-fade-up"
                   style={{ animationDelay: `${idx * 70}ms` }}
                 >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="eyebrow">
-                      {CATEGORY_LABEL[c.category] ?? c.category}
-                    </div>
-                    <span className="text-tiny text-ink-400">
-                      {Math.round(c.confidence * 100)}% 置信
-                    </span>
+                  <div className="eyebrow">
+                    {CATEGORY_LABEL[c.category] ?? c.category}
                   </div>
                   <h3 className="font-serif text-h3 text-ink-900 leading-tight mt-1.5">
                     {c.title}

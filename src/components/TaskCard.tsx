@@ -1,7 +1,8 @@
 import type { CareTask } from '@/lib/types'
 import { MemberPill } from './MemberPill'
 import { OriginatorLabel } from './OriginatorLabel'
-import { statusVisualFor } from '@/lib/status'
+import { statusVisualForTask } from '@/lib/status'
+import { useAppStore } from '@/lib/store'
 import { cn, formatDueDate } from '@/lib/utils'
 
 const CATEGORY_LABEL: Record<CareTask['category'], string> = {
@@ -24,7 +25,8 @@ export function TaskCard({
   active?: boolean
   simpleMode?: boolean
 }) {
-  const v = statusVisualFor(task.status)
+  const currentUserId = useAppStore((s) => s.currentUserId)
+  const v = statusVisualForTask(task, currentUserId)
   const label = simpleMode ? v.simpleLabel : v.proLabel
 
   return (

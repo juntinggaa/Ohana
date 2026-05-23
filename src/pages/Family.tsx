@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Avatar } from '@/components/Avatar'
 import { FamilyTraitsEditor } from '@/components/FamilyTraitsEditor'
 import { useAppStore } from '@/lib/store'
+import { taskAssigneeIds } from '@/lib/status'
 import type { CapacityTag, FamilyMember } from '@/lib/types'
 import { cn, formatPercent } from '@/lib/utils'
 
@@ -27,6 +28,7 @@ const CAPACITY_LABEL: Record<CapacityTag, string> = {
 
 export function FamilyPage() {
   const members = useAppStore((s) => s.familyMembers)
+  const currentUserId = useAppStore((s) => s.currentUserId)
   const tasks = useAppStore((s) => s.tasks)
   const accepted = useAppStore((s) => s.accepted)
   const mentalLoad = useAppStore((s) => s.mentalLoadAfter)
@@ -77,8 +79,12 @@ export function FamilyPage() {
   }
 
   function handleRemove(m: FamilyMember) {
-    if (m.id === 'tangning') {
-      pushToast('唐宁是主用户，不能删除', 'warn')
+    if (members.length <= 1) {
+      pushToast('至少保留一个家人', 'warn')
+      return
+    }
+    if (m.id === currentUserId) {
+      pushToast('不能删除当前正在使用的身份，请先切换到另一个家人', 'warn')
       return
     }
     if (confirm(`确定删除 ${m.name}？相关任务的指派会变成空。`)) {
@@ -104,7 +110,10 @@ export function FamilyPage() {
         <div className="border-t border-ink-200 pt-6 space-y-0">
           {members.map((m) => {
             const memberTasks = tasks.filter(
-              (t) => t.executorId === m.id || t.suggestedOwnerId === m.id,
+              (t) =>
+                taskAssigneeIds(t).includes(m.id) ||
+                t.suggestedOwnerId === m.id ||
+                t.subtasks.some((sub) => sub.suggestedOwnerId === m.id),
             )
             const acceptedHere = Object.values(accepted).filter((a) => a.ownerId === m.id).length
             const load = mentalLoad.find((e) => e.memberId === m.id)
@@ -178,7 +187,7 @@ export function FamilyPage() {
                     <button onClick={cancelEdit} className="btn-ghost">
                       取消
                     </button>
-                    {m.id !== 'tangning' && (
+                    {members.length > 1 && m.id !== currentUserId && (
                       <button
                         onClick={() => {
                           handleRemove(m)
@@ -237,7 +246,7 @@ export function FamilyPage() {
                       <div
                         className={cn(
                           'num text-h3 leading-none',
-                          m.id === 'tangning' && load.percentage > 0.5
+                          load.percentage > 0.5
                             ? 'text-rouge-500'
                             : 'text-ink-900',
                         )}
@@ -254,7 +263,7 @@ export function FamilyPage() {
 
         <div className="mt-6 text-tiny text-ink-500">
           💡 越多关于家人的信息（城市 / 时间情况 / traits），AI 推荐执行人就越准。
-          traits 像是「同城父母 / 会陪诊 / 已超载」这种短语，影响每条任务该派给谁。
+          traits 像是「同城老人 / 会陪诊 / 已超载」这种短语，影响每条任务该派给谁。
         </div>
       </div>
     </>

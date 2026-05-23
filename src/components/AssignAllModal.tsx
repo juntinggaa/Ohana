@@ -38,6 +38,7 @@ export function AssignAllModal({ task, onClose }: Props) {
   const members = useAppStore((s) => s.familyMembers)
   const pushToast = useAppStore((s) => s.pushToast)
   const pushNotification = useAppStore((s) => s.pushNotification)
+  const markAssignmentsSent = useAppStore((s) => s.markAssignmentsSent)
   const [copied, setCopied] = useState<string | null>(null)
   const [simulatedSent, setSimulatedSent] = useState(false)
 
@@ -87,6 +88,7 @@ export function AssignAllModal({ task, onClose }: Props) {
   }
 
   function handleSimulateSend() {
+    markAssignmentsSent(task.id)
     // 模拟：往每个被指派的人发一条 assignment 通知
     packs.forEach((p) => {
       pushNotification({
@@ -101,6 +103,7 @@ export function AssignAllModal({ task, onClose }: Props) {
   }
 
   function handleMarkSent() {
+    markAssignmentsSent(task.id)
     pushToast('已标记为已发送 · 后续回复会进收件箱', 'success')
     onClose()
   }

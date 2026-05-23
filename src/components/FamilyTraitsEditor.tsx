@@ -4,10 +4,10 @@ import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const SUGGESTED_TRAITS = [
-  '同城父母', '同城唐宁', '可跑腿', '会陪诊', '能买药',
+  '同城老人', '同城孩子', '同城家中', '可跑腿', '会陪诊', '能买药',
   '能拍照上传', '家务行政', '日历可靠', '可对接师傅',
-  '票据整理', '统筹', '在家时间多', '会拍照',
-  '了解爸爸状况', '不太会用 App', '只能做简单事',
+  '票据整理', '统筹', '时间灵活', '会拍照',
+  '了解家里状况', '不太会用 App', '只能做简单事',
   '不可承接医疗 / 行政', '已超载', '需要陪诊', '被照护对象',
 ]
 
@@ -83,7 +83,7 @@ export function FamilyTraitsEditor({
                 }
               }}
               className="flex-1 bg-paper border border-ink-300 px-2 py-1 text-tiny focus:border-ink-700 outline-none"
-              placeholder="例如：会拍照 / 同城父母 / 日历可靠"
+              placeholder="例如：会拍照 / 同城老人 / 日历可靠"
             />
             <button onClick={submit} className="btn-outline text-tiny">
               加

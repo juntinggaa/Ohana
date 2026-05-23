@@ -12,7 +12,12 @@ import { AssignAllModal } from './AssignAllModal'
 import { RAW_MESSAGES } from '@/lib/mockData'
 import { useAppStore } from '@/lib/store'
 import { useIsSimpleMode } from '@/lib/useUiMode'
-import { statusVisualFor } from '@/lib/status'
+import {
+  isTaskAcceptedByUser,
+  isTaskAssignedToUser,
+  statusVisualForTask,
+  taskAssigneeIds,
+} from '@/lib/status'
 import { cn, formatDueDate } from '@/lib/utils'
 
 interface Props {
@@ -100,28 +105,31 @@ export function TaskDetailModal({ task, onClose }: Props) {
 
   // Per-current-user state
   // 真正被指派 · 有子任务或被设为 executor（不包括"只是被建议"）
-  const isOwnerOfThis =
-    task.executorId === currentUserId ||
-    task.subtasks.some((s) => s.ownerId === currentUserId)
-  const isAssignedToMe = isOwnerOfThis || task.suggestedOwnerId === currentUserId
+  const isOwnerOfThis = isTaskAssignedToUser(task, currentUserId)
+  const originatorExists = members.some((m) => m.id === task.originatorId)
   const isOriginator =
-    task.originatorId === currentUserId || currentUserId === 'tangning'
-  const subtasksForMe = task.subtasks.filter((s) => s.ownerId === currentUserId)
-  const hasAccepted = task.acceptedBy?.includes(currentUserId) ?? false
+    task.originatorId === currentUserId ||
+    task.originatorId === 'system' ||
+    !originatorExists
+  const subtasksForMe = task.subtasks.filter(
+    (s) =>
+      s.ownerId === currentUserId ||
+      (!s.ownerId &&
+        task.status === 'pending_acceptance' &&
+        s.suggestedOwnerId === currentUserId),
+  )
+  const hasAccepted = isTaskAcceptedByUser(task, currentUserId)
 
   // 多人任务进度 · "已承接 X / Y 人"
-  const allAssignees = Array.from(
-    new Set(
-      task.subtasks
-        .map((s) => s.ownerId)
-        .filter((x): x is string => !!x),
-    ),
-  )
-  const totalAssignees = allAssignees.length || (task.executorId ? 1 : 0)
-  const acceptedCount = task.acceptedBy?.length ?? 0
-  const isMultiPerson = allAssignees.length > 1
+  const allAssignees = taskAssigneeIds(task)
+  const totalAssignees = allAssignees.length
+  const acceptedCount =
+    task.status === 'accepted' && (task.acceptedBy?.length ?? 0) === 0
+      ? totalAssignees
+      : allAssignees.filter((id) => task.acceptedBy?.includes(id)).length
+  const isMultiPerson = totalAssignees > 1
 
-  const statusV = statusVisualFor(task.status)
+  const statusV = statusVisualForTask(task, currentUserId)
 
   function handleAccept() {
     if (!acceptedOwner) return
@@ -636,12 +644,12 @@ export function TaskDetailModal({ task, onClose }: Props) {
               </section>
             )}
 
-            {/* 整体指派给一个人（旧流程） */}
-            {isOriginator && task.status !== 'completed' && (
+            {/* 整体指派给一个人（旧流程） · 仅对没有多人子任务的简单任务显示 */}
+            {isOriginator && task.status !== 'completed' && !isMultiPerson && (
               <section className="border-t border-ink-200 pt-8">
                 <div className="eyebrow mb-3">或：整体指派给一个人</div>
                 <p className="text-small text-ink-600 mb-5 max-w-xl">
-                  适合简单任务。复杂任务建议用上面的「全部按 AI 推荐指派」分到多人。
+                  这条任务比较简单，可以整段交给一个人。多人任务请用上面的「全部按 AI 推荐指派」。
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-4">
