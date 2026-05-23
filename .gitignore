@@ -28,3 +28,6 @@ Thumbs.db
 # Vercel
 .vercel
 
+
+# Generated decks (not source-controlled)
+*.pptx

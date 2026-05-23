@@ -1,43 +1,65 @@
 import { useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Copy } from 'lucide-react'
 import type { CareTask, ResponsibilityRisk } from '@/lib/types'
 import { MemberPill } from './MemberPill'
+import { useAppStore } from '@/lib/store'
 
 interface Props {
   risks: ResponsibilityRisk[]
   tasks: CareTask[]
-  onSendPrompt?: (risk: ResponsibilityRisk) => void
-  /** 默认显示几条，剩下的折叠 */
   initialVisible?: number
 }
 
 const TYPE_LABEL: Record<ResponsibilityRisk['type'], string> = {
-  vague_acknowledgement: '"收到"不等于责任',
-  missing_deadline: '缺截止时间',
-  missing_proof: '缺完成证明',
-  fallback_to_originator: '任务在悄悄掉回',
-  overloaded_originator: '发起人已超载',
+  vague_acknowledgement: '需要再确认一句',
+  missing_deadline: '还没有时间',
+  missing_proof: '还没有完成证明',
+  fallback_to_originator: '又回到同一个人',
+  overloaded_originator: '同一个人最近比较辛苦',
 }
 
 export function ResponsibilityTransferPanel({
   risks,
   tasks,
-  onSendPrompt,
   initialVisible = 2,
 }: Props) {
   const [showAll, setShowAll] = useState(false)
+  const pushToast = useAppStore((s) => s.pushToast)
+
   const visible = showAll ? risks : risks.slice(0, initialVisible)
   const hidden = risks.length - visible.length
+
+  async function handleCopy(risk: ResponsibilityRisk) {
+    const task = tasks.find((t) => t.id === risk.taskId)
+    const text = task
+      ? `【关于 ${task.title}】\n${risk.suggestedPrompt}`
+      : risk.suggestedPrompt
+    try {
+      await navigator.clipboard.writeText(text)
+      pushToast('已复制，可以粘贴到家庭群', 'success')
+    } catch {
+      pushToast('复制失败，请手动选择文字', 'warn')
+    }
+  }
+
+  if (risks.length === 0) {
+    return (
+      <div className="border-t border-ink-200 pt-10 text-center">
+        <p className="text-small text-ink-500 max-w-md mx-auto">
+          没有发现风险任务。所有任务都已经有人承接 + 有截止 + 有证明。
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       <div>
-        <div className="eyebrow mb-2">责任交接 · 系统替你写好的追问</div>
         <h2 className="font-serif text-h2 text-ink-900 leading-tight">
-          {risks.length} 句话，发出去就行。
+          {risks.length} 条家里可以一起补一下
         </h2>
-        <p className="mt-3 text-body text-ink-600 max-w-xl">
-          不是责怪谁。只是把"截止时间 + 证明"两项缺失补上，让任务真的落下来。
+        <p className="mt-2 text-small text-ink-500 max-w-xl">
+          不是责怪谁 —— 只是有些事还缺时间或者证明。补上一句，任务就真的落下来。
         </p>
       </div>
 
@@ -67,12 +89,15 @@ export function ResponsibilityTransferPanel({
                 <blockquote className="font-serif text-lead text-ink-900 italic border-l-2 border-rouge-500 pl-4">
                   {r.suggestedPrompt}
                 </blockquote>
-                <div className="mt-4 flex items-center gap-2">
-                  <button className="btn-primary" onClick={() => onSendPrompt?.(r)}>
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  <button className="btn-rouge" onClick={() => handleCopy(r)}>
                     <Send size={12} />
-                    发到家庭群
+                    复制到家庭群
                   </button>
-                  <button className="btn-ghost">改一下措辞</button>
+                  <button className="btn-ghost" onClick={() => handleCopy(r)}>
+                    <Copy size={12} />
+                    只复制文字
+                  </button>
                 </div>
               </div>
             </li>

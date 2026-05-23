@@ -1,100 +1,240 @@
+/**
+ * /overview · 家庭总览
+ *
+ * 所有家人都看得到的一页。
+ * 不强调"协调者"，也不把谁的心智负担当成头条数字。
+ * 重点放在：
+ *   - 家里这周的重要事项
+ *   - 哪些事情还没人接住
+ *   - 心力分布（温和，不是排行）
+ *   - 下周可以怎么分担（来自 CareBalancePanel）
+ */
+
 import { Link } from 'react-router-dom'
+import { ArrowRight, Inbox as InboxIcon, AlertTriangle } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { MentalLoadDashboard } from '@/components/MentalLoadDashboard'
-import { ResponsibilityTransferPanel } from '@/components/ResponsibilityTransferPanel'
-import {
-  MENTAL_LOAD_AFTER,
-  MENTAL_LOAD_BEFORE,
-  SAMPLE_RISKS,
-  SAMPLE_TASKS,
-} from '@/lib/mockData'
+import { CareBalancePanel } from '@/components/CareBalancePanel'
+import { TaskCard } from '@/components/TaskCard'
+import { TaskDetailModal } from '@/components/TaskDetailModal'
+import { OriginatorLabel } from '@/components/OriginatorLabel'
+import { useAppStore } from '@/lib/store'
+import { MENTAL_LOAD_BEFORE } from '@/lib/mockData'
+import { Stat } from '@/components/Stat'
+import { useUiMode } from '@/lib/useUiMode'
+import type { CareTask } from '@/lib/types'
+import { dueDateRank } from '@/lib/utils'
+
+function isUnassigned(t: CareTask): boolean {
+  return (
+    t.status === 'needs_owner' ||
+    t.status === 'fallback_risk' ||
+    t.status === 'pending_acceptance'
+  )
+}
+
+function isImportantThisWeek(t: CareTask): boolean {
+  if (t.status === 'completed') return false
+  return /(今天|明天|周一|本周|今晚)/.test(t.dueDateText ?? '')
+}
 
 export function DashboardPage() {
-  const fallbackCount = SAMPLE_TASKS.filter((t) => t.status === 'fallback_risk').length
-  const vagueCount = SAMPLE_RISKS.filter((r) => r.type === 'vague_acknowledgement').length
-  const before = MENTAL_LOAD_BEFORE.entries.find((e) => e.memberId === 'tangning')!.percentage
-  const after = MENTAL_LOAD_AFTER.entries.find((e) => e.memberId === 'tangning')!.percentage
-  const drop = Math.round((before - after) * 100)
+  const tasks = useAppStore((s) => s.tasks)
+  const accepted = useAppStore((s) => s.accepted)
+  const mentalLoadAfter = useAppStore((s) => s.mentalLoadAfter)
+  const mode = useUiMode()
+  const [active, setActive] = useState<CareTask | null>(null)
+
+  const acceptedCount = Object.keys(accepted).length
+
+  // ── 数据切片 · 按截止日期排序，最近的在最上 ──────────────
+  const importantThisWeek = useMemo(
+    () =>
+      tasks
+        .filter(isImportantThisWeek)
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
+    [tasks],
+  )
+  const unassignedAll = useMemo(
+    () =>
+      tasks
+        .filter(isUnassigned)
+        .slice()
+        .sort((a, b) => dueDateRank(a.dueDate) - dueDateRank(b.dueDate)),
+    [tasks],
+  )
+  // 卡片 section 只显示前 N 条；统计数字用全量
+  const importantSoon = importantThisWeek.slice(0, 6)
+  const unassigned = unassignedAll.slice(0, 4)
+
+  const activeFromStore = active ? tasks.find((t) => t.id === active.id) ?? null : null
+
+  if (tasks.length === 0) {
+    return <EmptyOverview />
+  }
 
   return (
     <>
       <PageHeader
-        eyebrow="第五夜 · 待办家事"
-        title="家里一直有人在记住，只是没人喊出名字。"
-        kicker="后台审计把「想到并安排」这件事，从一个人脑子里搬出来。"
+        title="家庭总览"
+        description="家里这周的状态 · 所有家人都看得到"
         actions={
-          <Link to="/pitch" className="btn-outline">
-            进入 Pitch
-          </Link>
+          mode !== 'elder' ? (
+            <Link to="/memory?mode=paste" className="btn-primary">
+              <InboxIcon size={14} />
+              粘新聊天分析
+            </Link>
+          ) : undefined
         }
       />
 
-      {/* Hero · 一个大数字 + 三个小数据 */}
-      <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-16">
-        <div className="border-t border-ink-200 pt-12 grid lg:grid-cols-[1fr_auto] gap-12 items-end">
-          <div>
-            <div className="eyebrow mb-4">凌晨 1:37 · 唐宁突然坐起来</div>
-            <div className="flex items-baseline gap-4">
-              <span className="num text-display text-rouge-500 leading-none">
-                {Math.round(before * 100)}
-              </span>
-              <span className="font-serif text-h2 text-ink-500">%</span>
-              <span className="font-serif text-h3 text-ink-700 italic ml-2">
-                的家庭后台
-              </span>
-            </div>
-            <p className="mt-5 font-serif text-lead text-ink-700 italic max-w-xl">
-              这是她一个人脑子里在跑的份额。
-              其他人各做各的事，但"谁该想到"一直没人接。
-            </p>
+      {/* 头条数字 · 与下面 section 数量一致 */}
+      <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-12">
+        <div className="border-t border-ink-200 pt-8 grid grid-cols-2 gap-6 md:gap-10 max-w-md">
+          <Stat label="家里重要事项" value={importantThisWeek.length} />
+          <Stat
+            label="还没人接住"
+            value={unassignedAll.length}
+            tone={unassignedAll.length > 0 ? 'rouge' : 'default'}
+          />
+        </div>
+      </section>
+
+      {/* 家里这周的重要事项 · 一行一条，按日期排序 */}
+      {importantSoon.length > 0 && (
+        <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-12">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-serif text-h3 text-ink-900">家里这周的重要事项</h2>
+            <Link
+              to="/me?view=all"
+              className="text-tiny text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
+            >
+              打开全部任务
+              <ArrowRight size={11} />
+            </Link>
           </div>
-          <dl className="grid grid-cols-3 gap-x-10 gap-y-2 text-right md:text-left lg:border-l lg:border-ink-200 lg:pl-12">
-            <Stat label="掉回唐宁" value={fallbackCount} />
-            <Stat label="模糊承接" value={vagueCount} />
-            <Stat label="可下降" value={`${drop}%`} tone="moss" />
-          </dl>
-        </div>
-      </section>
+          <div className="space-y-3">
+            {importantSoon.map((t) => (
+              <TaskCard key={t.id} task={t} onClick={() => setActive(t)} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Mental Load story */}
+      {/* 哪些事情还没人接住 */}
+      {unassigned.length > 0 && (
+        <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-12">
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
+              <AlertTriangle size={16} className="text-rouge-500" />
+              哪些事情还没人接住
+            </h2>
+            <span className="text-tiny text-ink-500">{unassigned.length} 件</span>
+          </div>
+          <ul className="space-y-3">
+            {unassigned.map((t) => (
+              <li
+                key={t.id}
+                className="border-l-2 border-rouge-200 bg-paper-50 px-5 py-4 flex items-start justify-between gap-4 flex-wrap"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="font-serif text-body text-ink-900">{t.title}</div>
+                  <div className="text-tiny text-ink-500 mt-1 flex items-center gap-2 flex-wrap">
+                    <OriginatorLabel
+                      id={t.originatorId}
+                      label={t.originatorLabel}
+                      size="xs"
+                    />
+                    {t.dueDateText && <span>· 截止 {t.dueDateText}</span>}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setActive(t)}
+                  className="btn-outline text-tiny shrink-0"
+                >
+                  看看怎么分
+                  <ArrowRight size={11} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* 心力分布 + 下周可以怎么分担 */}
       <section className="border-t border-ink-200 bg-paper-100">
-        <div className="max-w-6xl mx-auto px-8 lg:px-12 py-16">
-          <MentalLoadDashboard before={MENTAL_LOAD_BEFORE} after={MENTAL_LOAD_AFTER} />
+        <div className="max-w-6xl mx-auto px-8 lg:px-12 py-12 space-y-12">
+          <div>
+            <div className="flex items-end justify-between gap-6 mb-6 flex-wrap">
+              <div>
+                <h2 className="font-serif text-h2 text-ink-900 leading-tight">心力分布</h2>
+                <p className="mt-2 text-small text-ink-600 max-w-xl leading-relaxed">
+                  谁这一阵在"想到、追问、核对、兜底"。不是排行 —— 是给家里看，方便商量下周怎么分担。
+                </p>
+              </div>
+            </div>
+            <MentalLoadDashboard
+              before={{ label: '本周', entries: MENTAL_LOAD_BEFORE.entries }}
+              after={{
+                label: acceptedCount > 0 ? `已分担 ${acceptedCount} 条后` : '若按建议分担',
+                entries: mentalLoadAfter,
+              }}
+              initialView={acceptedCount > 0 ? 'after' : 'before'}
+            />
+          </div>
+
+          <div className="border-t border-ink-200 pt-10">
+            <CareBalancePanel />
+          </div>
         </div>
       </section>
 
-      {/* Responsibility risks */}
-      <section className="max-w-6xl mx-auto px-8 lg:px-12 py-16">
-        <ResponsibilityTransferPanel
-          risks={SAMPLE_RISKS}
-          tasks={SAMPLE_TASKS}
-          initialVisible={2}
-        />
-      </section>
+      {/* 更多入口（老人版隐藏） */}
+      {mode !== 'elder' && (
+        <section className="max-w-6xl mx-auto px-8 lg:px-12 py-12 border-t border-ink-200">
+          <div className="eyebrow mb-3">更多入口</div>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/mental-load" className="btn-outline text-tiny">
+              心力分布的细节
+            </Link>
+            <Link to="/memory?mode=paste" className="btn-outline text-tiny">
+              粘聊天给 AI
+            </Link>
+            <Link to="/me?view=all" className="btn-outline text-tiny">
+              全部事项
+            </Link>
+          </div>
+        </section>
+      )}
+
+      <TaskDetailModal task={activeFromStore} onClose={() => setActive(null)} />
     </>
   )
 }
 
-function Stat({
-  label,
-  value,
-  tone = 'default',
-}: {
-  label: string
-  value: string | number
-  tone?: 'default' | 'moss'
-}) {
+function EmptyOverview() {
+  const resetToSampleData = useAppStore((s) => s.resetToSampleData)
   return (
-    <div>
-      <div className="eyebrow mb-1.5">{label}</div>
-      <div
-        className={
-          'num text-h2 leading-none ' +
-          (tone === 'moss' ? 'text-moss-500' : 'text-ink-900')
-        }
-      >
-        {value}
-      </div>
-    </div>
+    <>
+      <PageHeader title="家庭总览" description="家里这周还很安静。" />
+      <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-20">
+        <div className="border-t border-ink-200 pt-16 text-center max-w-md mx-auto">
+          <p className="font-serif text-lead text-ink-500 mb-8">
+            状态已被清空。你可以重新载入示例家庭，也可以直接去收件箱粘贴自己的消息。
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <Link to="/memory?mode=paste" className="btn-primary">
+              <InboxIcon size={14} />
+              粘段群聊给 AI
+            </Link>
+            <button className="btn-outline" onClick={resetToSampleData}>
+              载入示例（唐宁家）
+            </button>
+          </div>
+        </div>
+      </section>
+    </>
   )
 }

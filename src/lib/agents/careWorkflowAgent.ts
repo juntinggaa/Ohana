@@ -100,6 +100,9 @@ export function generateWorkflow(task: Pick<CareTask, 'id' | 'category' | 'title
       ...s,
       id: `${task.id}-sub-${idx}`,
       completed: false,
+      // 把模板里的 ownerId 同时记到 suggestedOwnerId（AI 推荐 / 模板预设）
+      // 这样后续按"全部按推荐指派"时知道默认值
+      suggestedOwnerId: s.ownerId,
     })),
     requiredProof: tpl.requiredProof,
   }

@@ -1,35 +1,38 @@
 import { PageHeader } from '@/components/PageHeader'
 import { MentalLoadDashboard } from '@/components/MentalLoadDashboard'
 import { ResponsibilityTransferPanel } from '@/components/ResponsibilityTransferPanel'
-import {
-  MENTAL_LOAD_AFTER,
-  MENTAL_LOAD_BEFORE,
-  SAMPLE_RISKS,
-  SAMPLE_TASKS,
-} from '@/lib/mockData'
+import { useAppStore } from '@/lib/store'
+import { MENTAL_LOAD_BEFORE } from '@/lib/mockData'
 
 export function MentalLoadPage() {
+  const tasks = useAppStore((s) => s.tasks)
+  const risks = useAppStore((s) => s.risks)
+  const mentalLoadAfter = useAppStore((s) => s.mentalLoadAfter)
+  const acceptedCount = useAppStore((s) => Object.keys(s.accepted).length)
+
   return (
     <>
       <PageHeader
-        eyebrow="心智负担 · Mental Load Audit"
-        title="把「想到并安排」算成一个数。"
-        kicker="执行权重最低。兜底权重最高。第一次让隐形劳动有刻度。"
+        title="心力分布"
+        description="家里这阵子谁在想到、追问、核对、兜底 · 不是排行，只是为了下周好商量"
       />
 
-      <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-16">
-        <div className="border-t border-ink-200 pt-12">
-          <MentalLoadDashboard before={MENTAL_LOAD_BEFORE} after={MENTAL_LOAD_AFTER} />
+      <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-12">
+        <div className="border-t border-ink-200 pt-10">
+          <MentalLoadDashboard
+            before={{ label: '本周', entries: MENTAL_LOAD_BEFORE.entries }}
+            after={{
+              label: acceptedCount > 0 ? `已分担 ${acceptedCount} 条后` : '若按建议分担',
+              entries: mentalLoadAfter,
+            }}
+            initialView={acceptedCount > 0 ? 'after' : 'before'}
+          />
         </div>
       </section>
 
       <section className="border-t border-ink-200 bg-paper-100">
-        <div className="max-w-6xl mx-auto px-8 lg:px-12 py-16">
-          <ResponsibilityTransferPanel
-            risks={SAMPLE_RISKS}
-            tasks={SAMPLE_TASKS}
-            initialVisible={3}
-          />
+        <div className="max-w-6xl mx-auto px-8 lg:px-12 py-12">
+          <ResponsibilityTransferPanel risks={risks} tasks={tasks} initialVisible={3} />
         </div>
       </section>
     </>

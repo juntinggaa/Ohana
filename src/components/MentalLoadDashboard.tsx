@@ -12,6 +12,12 @@ interface Props {
   bare?: boolean
 }
 
+/**
+ * Mental load · 心力分布
+ *
+ * 不做排行 / 不做评分。
+ * 只是把家里这阵子"谁在想到、追问、核对、兜底"摊开来给大家看。
+ */
 export function MentalLoadDashboard({ before, after, initialView = 'before', bare }: Props) {
   const [view, setView] = useState<'before' | 'after'>(initialView)
   const current = view === 'before' ? before : after
@@ -19,25 +25,32 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
     () => Math.max(...current.entries.map((e) => e.score), 1),
     [current],
   )
-  const tangning = current.entries.find((e) => e.memberId === 'tangning')!
+
+  // 找出最辛苦的人（百分比最高），用一句温和的话描述
+  const heaviest = useMemo(() => {
+    const sorted = [...current.entries]
+      .filter((e) => e.score > 0)
+      .sort((a, b) => b.percentage - a.percentage)
+    return sorted[0]
+  }, [current])
+  const heaviestMember = heaviest ? getMember(heaviest.memberId) : undefined
 
   return (
     <div className="space-y-8">
-      {!bare && (
-        <div className="flex items-end justify-between gap-6">
-          <div>
-            <div className="eyebrow mb-3">本周心智负担分布</div>
-            <div className="flex items-baseline gap-3">
-              <span className="num text-display text-rouge-500 leading-none">
-                {Math.round(tangning.percentage * 100)}
-              </span>
-              <span className="font-serif text-h3 text-ink-500">%</span>
-            </div>
-            <div className="mt-2 text-small text-ink-600 italic font-serif">
+      {!bare && heaviestMember && (
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="max-w-xl">
+            <div className="eyebrow mb-3">这一段时间</div>
+            <p className="font-serif text-lead text-ink-900 leading-snug">
               {view === 'before'
-                ? '唐宁一个人，扛着家里 84% 的"想到与安排"。'
-                : '同样的一周，重新分配责任后，她的份额回到 30%。'}
-            </div>
+                ? `${heaviestMember.name} 处理了较多提醒和跟进事项。`
+                : `${heaviestMember.name} 的事项已经被分担一部分到其他家人。`}
+            </p>
+            <p className="mt-2 text-small text-ink-600 leading-relaxed">
+              {view === 'before'
+                ? '看看下面的分布，方便商量谁可以多接一些。'
+                : '剩下的部分，可以继续在家里轻轻商量。'}
+            </p>
           </div>
           <div className="inline-flex border border-ink-300">
             <button
@@ -49,7 +62,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
               )}
               onClick={() => setView('before')}
             >
-              使用前
+              本周
             </button>
             <button
               className={cn(
@@ -60,7 +73,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
               )}
               onClick={() => setView('after')}
             >
-              使用后
+              分担之后
             </button>
           </div>
         </div>
@@ -74,7 +87,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
             const m = getMember(e.memberId)
             if (!m) return null
             const width = (e.score / max) * 100
-            const isTangning = e.memberId === 'tangning'
+            const isHeaviest = e.memberId === heaviest?.memberId
             return (
               <div
                 key={`${view}-${e.memberId}`}
@@ -92,7 +105,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
                   <div
                     className={cn(
                       'h-full origin-left animate-bar-fill',
-                      isTangning ? 'bg-rouge-500' : 'bg-ink-700',
+                      isHeaviest ? 'bg-rouge-500' : 'bg-ink-700',
                     )}
                     style={{ width: `${width}%` }}
                   />
@@ -107,8 +120,8 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
 
       {!bare && (
         <div className="text-tiny text-ink-500 leading-relaxed pt-6 border-t border-ink-200 max-w-2xl">
-          公式 · 心智负担 = 想到 × 3 + 追问 × 2 + 核对 × 2 + 兜底 × 4 + 执行 × 1。
-          兜底权重最高，因为它是隐形劳动里最磨人的一种。
+          心力 = 想到 × 3 + 追问 × 2 + 核对 × 2 + 兜底 × 4 + 执行 × 1。
+          兜底的权重最高，因为它是最容易看不到、却最磨人的那部分。
         </div>
       )}
     </div>

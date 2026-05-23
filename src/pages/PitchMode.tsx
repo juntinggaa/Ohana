@@ -153,7 +153,7 @@ const SLIDES: Slide[] = [
     eyebrow: '产品定位',
     title: (
       <>
-        后台审计
+        欧哈娜 · Ohana
         <br />
         不是一个待办清单。
       </>

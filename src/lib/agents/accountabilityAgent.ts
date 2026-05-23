@@ -88,11 +88,11 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         personId: task.executorId ?? task.originatorId,
         type: 'fallback_to_originator',
         severity: 'high',
-        message: `任务正在悄悄回到${task.executorId === 'tangning' ? '唐宁' : '发起人'}`,
+        message: '这条又回到同一个人手上 · 可以正式交接一下',
         suggestedPrompt:
           task.suggestedOwnerId
-            ? `建议把任务正式转给${task.suggestedOwnerId === 'bro' ? '弟弟' : task.suggestedOwnerId}，并要求他确认承接（含截止 + 证明）。`
-            : '建议立即明确一名执行人，否则唐宁会兜底。',
+            ? `可以试着请${task.suggestedOwnerId === 'bro' ? '弟弟' : task.suggestedOwnerId}承接（含截止 + 证明），让任务真的落下来。`
+            : '可以家里轻轻商量一下：这条交给谁更合适。',
       })
     }
 
@@ -104,8 +104,8 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         personId: 'tangning',
         type: 'overloaded_originator',
         severity: 'high',
-        message: `唐宁本周心智负担已达 ${(tangningLoad.percentage * 100).toFixed(0)}%，建议把这条交出`,
-        suggestedPrompt: '建议改派给同城弟弟或在家的周勉。',
+        message: '同一个人最近处理了比较多家里的事 · 这条可以让别人接住',
+        suggestedPrompt: '可以试着改派给同城弟弟，或者在家的周勉。',
       })
     }
   })
