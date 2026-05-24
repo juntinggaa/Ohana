@@ -86,9 +86,9 @@ const TEMPLATES: WorkflowTemplate[] = [
   {
     category: 'general_family',
     subtasks: [
-      { title: '明确具体需要做什么', phase: 'before' },
-      { title: '指派一名执行人', phase: 'before' },
-      { title: '执行', phase: 'during' },
+      { title: '先听清楚家人需要什么', phase: 'before' },
+      { title: '问问谁这次比较方便', phase: 'before' },
+      { title: '陪着完成这件小事', phase: 'during' },
       { title: '在家庭群里说一句"做完了"', phase: 'after' },
     ],
     requiredProof: [],

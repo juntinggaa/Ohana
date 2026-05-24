@@ -1,13 +1,19 @@
 /**
- * llmClient · 统一 LLM 接入层 · DeepSeek 主线
+ * llmClient · 统一 LLM 接入层
+ *
+ * 当前 provider · OpenRouter (走 deepseek-chat-v3)
  *
  * 设计：
- *   1. 优先调真实 DeepSeek（chat 接口，OpenAI 兼容）
+ *   1. 优先调真实 LLM（OpenAI 兼容接口 · /chat/completions）
  *   2. 没有 key 时回退到本地确定性逻辑（mock）
  *   3. 调用失败时回退到 mock，不让 UI 死掉
  *
- * ⚠️ 当前实现把 key 通过 VITE_ 暴露到前端。这对本地 demo OK，
- *    但部署到 Vercel 时必须改成走后端 /api/llm 路由，否则浏览器开发者工具能看到 key。
+ * Env vars (按优先级)：
+ *   - VITE_OPENROUTER_API_KEY  · 推荐
+ *   - VITE_DEEPSEEK_API_KEY    · 老 key 名 · 兼容用
+ *
+ * ⚠️ 当前实现把 key 通过 VITE_ 暴露到前端。这对本地 demo / 黑客松 OK，
+ *    但生产环境务必走后端代理（例如 /api/llm 路由），否则浏览器开发者工具能看到 key。
  */
 
 export type LLMMode = 'mock' | 'remote'
@@ -23,15 +29,19 @@ export interface LLMResponse<T> {
 }
 
 const env = (import.meta as { env?: Record<string, string> }).env ?? {}
-const DEEPSEEK_KEY = env.VITE_DEEPSEEK_API_KEY ?? ''
-const DEEPSEEK_BASE = 'https://api.deepseek.com/v1'
+// 优先用 OPENROUTER · 兼容老的 DEEPSEEK 变量名
+const LLM_KEY = env.VITE_OPENROUTER_API_KEY ?? env.VITE_DEEPSEEK_API_KEY ?? ''
+const OPENROUTER_BASE = 'https://openrouter.ai/api/v1'
+// OpenRouter 上 DeepSeek-V3 的型号名（rolling alias）
+const DEFAULT_MODEL = 'deepseek/deepseek-chat'
 
 export function getLLMMode(): LLMMode {
-  return DEEPSEEK_KEY ? 'remote' : 'mock'
+  return LLM_KEY ? 'remote' : 'mock'
 }
 
+/** 保留旧名，外部调用点不用改 */
 export function hasDeepSeekKey(): boolean {
-  return Boolean(DEEPSEEK_KEY)
+  return Boolean(LLM_KEY)
 }
 
 interface ChatMessage {
@@ -45,19 +55,23 @@ interface ChatOptions {
   /** 期望返回 JSON */
   json?: boolean
   temperature?: number
-  model?: 'deepseek-chat' | 'deepseek-reasoner'
+  /** OpenRouter 上的模型名，省略时走 deepseek-chat-v3 */
+  model?: string
 }
 
 /**
- * 低层调用 · 直接调 DeepSeek，返回字符串内容。
+ * 低层调用 · 走 OpenRouter，OpenAI 兼容协议。
+ * 函数名保留 callDeepSeek 是为了让既有调用点不动。
  */
 export async function callDeepSeek(opts: ChatOptions): Promise<string> {
-  if (!DEEPSEEK_KEY) {
-    throw new Error('No DeepSeek API key. Add VITE_DEEPSEEK_API_KEY to .env')
+  if (!LLM_KEY) {
+    throw new Error(
+      'No LLM API key. Add VITE_OPENROUTER_API_KEY to your .env or Vercel env.',
+    )
   }
 
   const body = {
-    model: opts.model ?? 'deepseek-chat',
+    model: opts.model ?? DEFAULT_MODEL,
     messages: [
       { role: 'system', content: opts.system },
       { role: 'user', content: opts.user },
@@ -66,18 +80,22 @@ export async function callDeepSeek(opts: ChatOptions): Promise<string> {
     ...(opts.json ? { response_format: { type: 'json_object' } } : {}),
   }
 
-  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${DEEPSEEK_KEY}`,
+      Authorization: `Bearer ${LLM_KEY}`,
+      // OpenRouter 推荐这两个，用于他们的统计面板（可缺省）
+      'HTTP-Referer':
+        typeof window !== 'undefined' ? window.location.origin : 'https://ohana.app',
+      'X-Title': 'Ohana · 欧哈娜',
     },
     body: JSON.stringify(body),
   })
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`DeepSeek ${res.status}: ${text || res.statusText}`)
+    throw new Error(`OpenRouter ${res.status}: ${text || res.statusText}`)
   }
 
   const data = (await res.json()) as {
@@ -85,7 +103,7 @@ export async function callDeepSeek(opts: ChatOptions): Promise<string> {
   }
   const content = data.choices?.[0]?.message?.content
   if (typeof content !== 'string') {
-    throw new Error('DeepSeek returned no content')
+    throw new Error('OpenRouter returned no content')
   }
   return content
 }

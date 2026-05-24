@@ -153,33 +153,33 @@ function generateReply(ctx: ReplyCtx): string {
     if (riskSignal)
       return `我帮你整理好了：这可能需要持续记录。${who ? who + '可以' : ''}每天拍一张读数，${owner}陪诊，唐宁只看汇总。`
     if (ruleCategory === 'elderly_care')
-      return `知道了。我把它存成"${title}"，建议${owner}处理，今晚前完成。`
+      return `知道了。我把"${title}"记下来了，可以先问问${owner}今晚是否方便帮忙。`
     if (ruleCategory === 'medical')
-      return `好，复诊任务我建好了。陪诊默认派给${owner}，前一晚记得提醒。`
+      return `好，复诊的牵挂我记下来了。可以问问${owner}是否方便陪诊，前一晚也别忘了互相提醒。`
     if (ruleCategory === 'household_admin')
-      return `这件事我交给${owner}，本周内能完成。`
+      return `这件家中小事我记下了，可以先问问${owner}本周是否方便照看。`
     if (ruleCategory === 'child_school')
-      return `孩子学校的事我建好了，建议交给${owner}，第二天早上直接到班级门口。`
+      return `孩子学校的事我记好了，可以问问${owner}明早是否方便陪着完成。`
     if (ruleCategory === 'reimbursement')
-      return `报销整理我交给${owner}，本周内完成。`
-    return `我把它存成"${title}"，建议交给${owner}。`
+      return `票据整理我记下了，可以问问${owner}这周是否有余裕帮忙。`
+    return `我把"${title}"记下了，可以问问${owner}是否方便帮一把。`
   }
 
   // 用户自己的家 · 更克制的中性回复，不剧本化
   if (intent === 'availability_update')
-    return `收到，我把这句话当成可用时间/限制来记。之后分配任务时，会优先参考它。`
+    return `收到，我把你最近的节奏记下来了。之后需要帮忙时，会先尊重这份感受。`
   if (intent === 'redistribution_request')
-    return `我明白了：这不是新增一件事，而是需要把责任重新分出去。我会把它记成一次分担请求。`
+    return `我明白了：你最近有些累。这份需要分担的感受我会记下来，邀请家人一起回应。`
   if (intent === 'question')
-    return `我先把你的问题记下来：${title}。如果它需要家人跟进，也可以转成任务。`
+    return `我先把你的问题记下来：${title}。需要时，可以再请家人一起回应。`
   if (intent === 'care_note')
-    return `我先把它作为家庭记忆保存：${title}。它不一定要变成任务。`
+    return `我把这句话放进家庭记忆里：${title}。它被听见就已经很好。`
   if (riskSignal)
-    return `我帮你整理成一件事：${title}。${owner ? '建议先记下来 · 由 ' + owner + ' 跟进。' : '看看要不要建任务。'}`
+    return `这份担心值得留意：${title}。${owner ? '可以先问问 ' + owner + ' 是否方便陪着看看。' : '可以邀请家人一起看看。'}`
   if (ruleCategory)
-    return `好，我整理成了一件事：${title}。${owner ? '建议交给 ' + owner + '。' : ''}`
+    return `好，我记下了这件需要照应的事：${title}。${owner ? '可以先问问 ' + owner + ' 是否方便。' : ''}`
   // 完全没匹配 category —— 仍然建任务
-  return `我整理成了一件事：${title}。看看下面对不对，要不要直接加进列表。`
+  return `我把这句话整理好了：${title}。看看是否值得请家人一起留意。`
 }
 
 /* -------------------------------------------------------------------------- */
@@ -301,24 +301,24 @@ export function processFamilyMemoryMessage(args: {
         label:
           intent === 'risk_signal'
             ? ownerName
-              ? `创建跟进任务并通知 ${ownerName}`
-              : '创建跟进任务'
+              ? `请 ${ownerName} 一起留意`
+              : '请家人一起留意'
             : intent === 'redistribution_request'
-              ? '创建一条分担讨论任务'
+              ? '邀请家人一起分担'
               : ownerName
-                ? `创建任务并通知 ${ownerName}`
-                : '创建任务',
-        title: intent === 'redistribution_request' ? '重新分配家庭任务' : title,
+                ? `请 ${ownerName} 一起照看`
+                : '留下这件牵挂',
+        title: intent === 'redistribution_request' ? '一起商量怎样轻松一点' : title,
         category,
         ownerId: recommendation?.ownerId,
         subtasks:
           intent === 'redistribution_request'
-            ? ['列出现在没人接住的事', '重新确认每个人能做哪一部分', '发出新的承接卡片']
+            ? ['说说最近最操心的事', '问问每个人最近是否方便', '给愿意帮忙的家人留句话']
           : matchedForIntent?.defaultSubtasks ?? [],
         deadline: matchedForIntent?.defaultDeadline,
         reason:
           intent === 'redistribution_request'
-            ? '有人提出需要重新分担，先把请求变成一条可讨论、可指派的事。'
+            ? '有人说出了疲惫，先让这份感受被看见，再一起商量怎么帮。'
             : recommendation?.reason,
         speakerId,
         speakerName: speaker?.name,
@@ -342,7 +342,7 @@ export function processFamilyMemoryMessage(args: {
     })
     actions.push(
       createTaskAction({
-        label: '还是转成任务',
+        label: '请家人一起留意',
         title,
         category,
         ownerId: recommendation?.ownerId,
@@ -357,7 +357,7 @@ export function processFamilyMemoryMessage(args: {
   if (related.length > 0) {
     actions.push({
       id: newId('act'),
-      label: `更新现有任务（${related[0].title}）`,
+      label: `补充已有牵挂（${related[0].title}）`,
       actionType: 'update_task',
       payload: { taskId: related[0].id },
     })
@@ -365,7 +365,7 @@ export function processFamilyMemoryMessage(args: {
   if (shouldOfferPrimaryTask(intent)) {
     actions.push({
       id: newId('act'),
-      label: '只记录，不建任务',
+      label: '只留在家庭记忆',
       actionType: 'notify_family',
       payload: { note_only: true, speakerId, rawMessage: trimmed },
     })

@@ -13,12 +13,12 @@ export function MentalLoadPage() {
   return (
     <>
       <PageHeader
-        title="心力分布"
-        description="家里这阵子谁在想到、追问、核对、兜底 · 不是排行，只是为了下周好商量"
+        title="彼此的心事"
+        description="看见谁最近惦记得多一些，才知道可以先抱抱谁、帮帮谁。"
       />
 
       <section className="max-w-6xl mx-auto px-8 lg:px-12 pb-12">
-        <div className="border-t border-ink-200 pt-10">
+        <div className="petal-card p-6 md:p-8">
           <MentalLoadDashboard
             before={{ label: '本周', entries: mentalLoadBefore }}
             after={{
@@ -30,7 +30,7 @@ export function MentalLoadPage() {
         </div>
       </section>
 
-      <section className="border-t border-ink-200 bg-paper-100">
+      <section className="border-t border-paper-200 bg-paper-100/60">
         <div className="max-w-6xl mx-auto px-8 lg:px-12 py-12">
           <ResponsibilityTransferPanel risks={risks} tasks={tasks} initialVisible={3} />
         </div>

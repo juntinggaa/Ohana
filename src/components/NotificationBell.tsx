@@ -4,12 +4,12 @@ import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const KIND_LABEL: Record<string, string> = {
-  assignment: '新指派',
-  accepted: '被承接',
-  rejected: '被拒绝',
-  snoozed: '推迟回复',
-  completed: '已完成',
-  nudge: '催办',
+  assignment: '请你帮忙',
+  accepted: '有人回应',
+  rejected: '暂不方便',
+  snoozed: '稍后回应',
+  completed: '已经安心',
+  nudge: '轻轻提醒',
 }
 
 export function NotificationBell() {
@@ -45,7 +45,7 @@ export function NotificationBell() {
       <button
         onClick={() => setOpen((o) => !o)}
         className="relative text-ink-500 hover:text-ink-900 p-1.5"
-        aria-label="通知"
+        aria-label="家里的消息"
       >
         <Bell size={16} />
         {unread > 0 && (
@@ -56,9 +56,9 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 w-[360px] max-w-[90vw] bg-paper border border-ink-200 shadow-card z-50 animate-fade-in">
-          <div className="px-4 py-3 border-b border-ink-100 flex items-center justify-between">
-            <div className="eyebrow">通知</div>
+        <div className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-paper-50 rounded-2xl border border-paper-200 shadow-card z-50 animate-fade-in overflow-hidden">
+          <div className="px-4 py-3 border-b border-paper-200 flex items-center justify-between">
+            <div className="eyebrow">家里的消息</div>
             {unread > 0 && (
               <button
                 className="text-tiny text-ink-500 hover:text-ink-900 inline-flex items-center gap-1"
@@ -72,14 +72,14 @@ export function NotificationBell() {
           <ul className="max-h-96 overflow-y-auto">
             {notifications.length === 0 ? (
               <li className="px-4 py-10 text-center text-small text-ink-500">
-                还没有通知
+                还没有新消息，家里很安稳。
               </li>
             ) : (
               notifications.map((n) => (
                 <li
                   key={n.id}
                   className={cn(
-                    'px-4 py-3 border-b border-ink-100 transition cursor-pointer',
+                    'px-4 py-3 border-b border-paper-200 transition cursor-pointer',
                     !n.read ? 'bg-paper-50 hover:bg-paper-100' : 'hover:bg-paper-50',
                   )}
                   onClick={() => markRead(n.id)}

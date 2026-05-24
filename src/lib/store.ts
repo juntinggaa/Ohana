@@ -13,8 +13,10 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   AppNotification,
   CareTask,
+  FamilyChatMessage,
   FamilyMember,
   FamilyMemoryEntry,
+  HouseholdMemory,
   MentalLoadEntry,
   NotificationKind,
   ResponsibilityRisk,
@@ -23,7 +25,7 @@ import type {
   TaskAttachment,
   TaskResponse,
 } from './types'
-import { FAMILY_MEMBERS, MENTAL_LOAD_BEFORE } from './mockData'
+import { FAMILY_MEMBERS, MENTAL_LOAD_BEFORE, SAMPLE_HOUSEHOLD_MEMORIES } from './mockData'
 import { buildSnapshot } from './mentalLoad'
 import { generateWorkflow } from './agents/careWorkflowAgent'
 import { recommendForCategoryFallback } from './agents/assignmentAgent'
@@ -69,6 +71,8 @@ interface AppState {
 
   // ─── Family Memory Chat ──────────────────────────────
   familyMemoryEntries: FamilyMemoryEntry[]
+  familyChatMessages: FamilyChatMessage[]
+  householdMemories: HouseholdMemory[]
 
   // ─── Ephemeral UI ────────────────────────────────────
   toasts: Toast[]
@@ -110,6 +114,9 @@ interface AppState {
     extras?: { taskId?: string; notifiedOwnerId?: string },
   ) => void
   clearFamilyMemoryEntries: () => void
+  pushFamilyChatMessage: (message: FamilyChatMessage) => void
+  addHouseholdMemory: (memory: Omit<HouseholdMemory, 'id' | 'createdAt'>) => HouseholdMemory
+  removeHouseholdMemory: (id: string) => void
 
   // ─── Multi-user actions ──────────────────────────────
   respondToTask: (taskId: string, action: ResponseAction, reason?: string) => void
@@ -283,6 +290,8 @@ export const useAppStore = create<AppState>()(
 
       // family memory
       familyMemoryEntries: [],
+      familyChatMessages: [],
+      householdMemories: [],
 
       // ephemeral
       toasts: [],
@@ -428,11 +437,11 @@ export const useAppStore = create<AppState>()(
           get().pushNotification({
             recipientId: ownerId,
             kind: 'assignment',
-            message: `${nameOf(get().currentUserId, get().familyMembers)} 把「${task.title}」指给了你 · 截止 ${deadline}`,
+            message: `${nameOf(get().currentUserId, get().familyMembers)} 想请你一起照看「${task.title}」· 希望时间：${deadline}`,
             taskId,
           })
         }
-        get().pushToast('已发出指派卡片到家庭群 · 等对方确认', 'success')
+        get().pushToast('已把问候消息发给家人 · 等 ta 回应', 'success')
       },
 
       unacceptResponsibility: (taskId) => {
@@ -573,7 +582,7 @@ export const useAppStore = create<AppState>()(
             ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
           }
         })
-        get().pushToast('任务已标记完成', 'success')
+        get().pushToast('这件事已经安心了', 'success')
       },
 
       removeTask: (taskId) =>
@@ -629,6 +638,31 @@ export const useAppStore = create<AppState>()(
         })),
 
       clearFamilyMemoryEntries: () => set({ familyMemoryEntries: [] }),
+
+      pushFamilyChatMessage: (message) =>
+        set((s) => ({ familyChatMessages: [...s.familyChatMessages, message] })),
+
+      addHouseholdMemory: (memory) => {
+        const created: HouseholdMemory = {
+          id: newId('knowledge'),
+          createdAt: Date.now(),
+          ...memory,
+        }
+        set((s) => {
+          const withoutDuplicate = s.householdMemories.filter(
+            (existing) =>
+              existing.title !== created.title &&
+              existing.sourceMessageId !== created.sourceMessageId,
+          )
+          return { householdMemories: [created, ...withoutDuplicate] }
+        })
+        return created
+      },
+
+      removeHouseholdMemory: (id) =>
+        set((s) => ({
+          householdMemories: s.householdMemories.filter((memory) => memory.id !== id),
+        })),
 
       // ───── multi-user collaboration ──────────────────
       respondToTask: (taskId, action, reason) => {
@@ -702,14 +736,14 @@ export const useAppStore = create<AppState>()(
             get().pushNotification({
               recipientId: assigner,
               kind: 'accepted',
-              message: `${responderName} 承接了「${task.title}」`,
+              message: `${responderName} 愿意一起照看「${task.title}」`,
               taskId,
             })
           }
           // 检查是否全员承接
           const updated = get().tasks.find((t) => t.id === taskId)
           if (updated?.status === 'accepted') {
-            get().pushToast(`全员已承接「${task.title}」`, 'success')
+            get().pushToast(`大家都有回应：「${task.title}」有人陪着了`, 'success')
           } else {
             const totalSubAssignees = Array.from(
               new Set(
@@ -721,8 +755,8 @@ export const useAppStore = create<AppState>()(
             const acceptedCount = updated?.acceptedBy?.length ?? 0
             get().pushToast(
               totalSubAssignees > 1
-                ? `已承接你的部分 · ${acceptedCount} / ${totalSubAssignees} 人确认`
-                : `已承接「${task.title}」`,
+                ? `谢谢你愿意帮忙 · ${acceptedCount} / ${totalSubAssignees} 人回应`
+                : `谢谢你愿意照看「${task.title}」`,
               'success',
             )
           }
@@ -829,6 +863,8 @@ export const useAppStore = create<AppState>()(
           responses: [],
           notifications: [],
           familyMemoryEntries: [],
+          familyChatMessages: [],
+          householdMemories: SAMPLE_HOUSEHOLD_MEMORIES,
           currentUserId: 'tangning',
           uiModeOverride: 'auto',
         }),
@@ -844,6 +880,8 @@ export const useAppStore = create<AppState>()(
             responses: [],
             notifications: [],
             familyMemoryEntries: [],
+            familyChatMessages: [],
+            householdMemories: [],
             ...buildMentalLoadPatch(s.familyMembers, tasks, accepted),
           }
         }),
@@ -874,6 +912,8 @@ export const useAppStore = create<AppState>()(
         responses: s.responses,
         notifications: s.notifications,
         familyMemoryEntries: s.familyMemoryEntries,
+        familyChatMessages: s.familyChatMessages,
+        householdMemories: s.householdMemories,
       }),
       // 防御性地修复老数据 —— 任何字段缺失都给一个安全默认
       onRehydrateStorage: () => (state) => {
@@ -900,6 +940,8 @@ export const useAppStore = create<AppState>()(
         if (!Array.isArray(state.responses)) state.responses = []
         if (!Array.isArray(state.notifications)) state.notifications = []
         if (!Array.isArray(state.familyMemoryEntries)) state.familyMemoryEntries = []
+        if (!Array.isArray(state.familyChatMessages)) state.familyChatMessages = []
+        if (!Array.isArray(state.householdMemories)) state.householdMemories = []
         if (!state.uiModeOverride) state.uiModeOverride = 'auto'
         // v8 之前："指派并标记已发出"会把任务误标成 accepted。
         // 真正的承接一定有 accepted response；没有回应记录的 accepted 视为仍待确认。

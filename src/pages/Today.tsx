@@ -11,7 +11,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  ArrowRight, Bell, HelpingHand, Users, Inbox as InboxIcon,
+  ArrowRight, Heart, HelpingHand, Users, Inbox as InboxIcon,
 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { TaskCard } from '@/components/TaskCard'
@@ -79,12 +79,12 @@ function couldHelp(t: CareTask, userTraits: string[], userId: string): boolean {
   if (isTaskDraft(t)) return false                          // 还没分配 · 不出现在别人视图
   if (isTaskAssignedToUser(t, userId)) return false
   const traitsHints: Record<CareTask['category'], string[]> = {
-    elderly_care: ['同城父母', '同城老人', '可跑腿', '会陪诊', '能买药'],
-    medical: ['同城父母', '同城老人', '会陪诊', '可跑腿'],
-    child_school: ['同城孩子', '同城学校', '能拍照上传', '家务行政'],
-    household_admin: ['家务行政', '日历可靠', '可对接师傅', '同城家中'],
-    reimbursement: ['票据整理', '统筹'],
-    general_family: ['能拍照上传'],
+    elderly_care: ['同城父母', '同城老人', '和父母同城', '和长辈同城', '可跑腿', '方便帮忙跑一趟', '会陪诊', '愿意陪诊', '能买药', '方便买药'],
+    medical: ['同城父母', '同城老人', '和父母同城', '和长辈同城', '会陪诊', '愿意陪诊', '可跑腿', '方便帮忙跑一趟'],
+    child_school: ['同城孩子', '和孩子同城', '同城学校', '能拍照上传', '会分享照片', '家务行政', '会打理家中安排'],
+    household_admin: ['家务行政', '会打理家中安排', '日历可靠', '会记住重要日子', '可对接师傅', '方便接待师傅', '同城家中', '方便到家里'],
+    reimbursement: ['票据整理', '会整理票据', '统筹', '善于统筹'],
+    general_family: ['能拍照上传', '会分享照片'],
   }
   const hints = traitsHints[t.category] ?? []
   return userTraits.some((tr) => hints.includes(tr))
@@ -92,11 +92,11 @@ function couldHelp(t: CareTask, userTraits: string[], userId: string): boolean {
 
 const CATEGORY_TABS: { id: TaskCategory | 'all'; label: string }[] = [
   { id: 'all', label: '全部' },
-  { id: 'elderly_care', label: '老人' },
-  { id: 'medical', label: '医疗' },
+  { id: 'elderly_care', label: '长辈' },
+  { id: 'medical', label: '健康' },
   { id: 'child_school', label: '孩子' },
-  { id: 'household_admin', label: '家务' },
-  { id: 'reimbursement', label: '票据' },
+  { id: 'household_admin', label: '家中' },
+  { id: 'reimbursement', label: '留存' },
 ]
 
 /* -------------------------------------------------------------------------- */
@@ -127,14 +127,20 @@ export function TodayPage() {
     return (
       <>
         <PageHeader
-          title={isSimple ? '事项' : '事项'}
-          description="还没有任务，去家庭记忆粘一段聊天试试。"
+          title="为你留意"
+          description="这里还没有需要操心的事。可以先和家人说一句近况。"
         />
-        <div className="max-w-6xl mx-auto px-8 lg:px-12 pb-20">
-          <div className="border-t border-ink-200 pt-16 text-center">
-            <Link to="/memory?mode=paste" className="btn-primary">
+        <div className="max-w-6xl mx-auto px-6 lg:px-12 pb-20">
+          <div className="petal-card p-10 text-center max-w-xl">
+            <p className="font-serif text-lead text-ink-700 mb-6">
+              今天没有要赶着处理的事，留点时间问候一下彼此吧。
+            </p>
+            <Link to="/memory" className="btn-primary mr-3">
               <InboxIcon size={14} />
-              粘段群聊给 AI
+              说一句近况
+            </Link>
+            <Link to="/memory?mode=paste" className="btn-outline">
+              带入消息
             </Link>
           </div>
         </div>
@@ -142,14 +148,14 @@ export function TodayPage() {
     )
   }
 
-  const title = mode === 'elder' ? `${me?.name ?? ''}，今天要做这几件事` : '事项'
+  const title = mode === 'elder' ? `${me?.name ?? ''}，今天好吗？` : '为你留意'
   const myRelatedCount = tasks.filter((t) => isRelatedToUser(t, currentUserId)).length
   const description =
     mode === 'elder'
       ? '不急，一件一件来。完成后拍张照片就好。'
       : view === 'mine'
-        ? `以 ${me?.name ?? '?'} 的视角 · 与你有关的 ${myRelatedCount} 条`
-        : `家里所有 ${tasks.length} 条任务`
+        ? `给 ${me?.name ?? '?'} 的温柔提醒 · 有 ${myRelatedCount} 件事与你有关`
+        : `全家一起记挂的 ${tasks.length} 件事`
 
   return (
     <>
@@ -157,31 +163,31 @@ export function TodayPage() {
 
       {/* View tab · 老人版不显示 */}
       {mode !== 'elder' && (
-        <div className="max-w-6xl mx-auto px-8 lg:px-12 pt-2 pb-6">
-          <div className="inline-flex border border-ink-300">
+        <div className="max-w-6xl mx-auto px-6 lg:px-12 pt-2 pb-7">
+          <div className="segmented">
             <button
               onClick={() => setView('mine')}
               className={cn(
-                'inline-flex items-center gap-1.5 px-4 py-2 text-tiny transition',
+                'segment',
                 view === 'mine'
-                  ? 'bg-ink-900 text-paper'
+                  ? 'segment-active'
                   : 'text-ink-600 hover:text-ink-900',
               )}
             >
               <HelpingHand size={12} />
-              我的事项
+              与我有关
             </button>
             <button
               onClick={() => setView('all')}
               className={cn(
-                'inline-flex items-center gap-1.5 px-4 py-2 text-tiny transition border-l border-ink-300',
+                'segment',
                 view === 'all'
-                  ? 'bg-ink-900 text-paper'
+                  ? 'segment-active'
                   : 'text-ink-600 hover:text-ink-900',
               )}
             >
               <Users size={12} />
-              全部事项
+              全家牵挂
             </button>
           </div>
         </div>
@@ -283,14 +289,14 @@ function MineView({
   if (mode === 'elder') {
     const allToday = [...myToday, ...waitingOnMe]
     return (
-      <div className="max-w-3xl mx-auto px-8 lg:px-12 pb-24">
+      <div className="max-w-3xl mx-auto px-6 lg:px-12 pb-24">
         {allToday.length === 0 ? (
-          <div className="border-t border-ink-200 pt-16 text-center">
+          <div className="petal-card px-6 py-14 text-center">
             <p className="font-serif text-h3 text-ink-700">今天没什么要紧的事。</p>
             <p className="text-lead text-ink-500 mt-3">不急 · 可以喘口气。</p>
           </div>
         ) : (
-          <div className="border-t border-ink-200 pt-10 space-y-6">
+          <div className="space-y-6">
             {allToday.map((t) => (
               <ElderTaskCard
                 key={t.id}
@@ -312,15 +318,15 @@ function MineView({
     myDrafts.length === 0
 
   return (
-    <div className="max-w-5xl mx-auto px-8 lg:px-12 pb-20 space-y-14">
+    <div className="max-w-5xl mx-auto px-6 lg:px-12 pb-20 space-y-12">
       {/* 今天要做 */}
-      <section className="border-t border-ink-200 pt-8">
+      <section className="petal-card p-6 md:p-8">
         <div className="flex items-baseline justify-between mb-5">
-          <h2 className="font-serif text-h3 text-ink-900">今天要做的事</h2>
+          <h2 className="font-serif text-h3 text-ink-900">今天先照顾好这些</h2>
           <span className="text-tiny text-ink-500">{myToday.length} 件</span>
         </div>
         {myToday.length === 0 ? (
-          <p className="text-small text-ink-500 italic">今天没有临近截止的事。</p>
+          <p className="text-small text-ink-500">今天没有赶时间的牵挂，可以轻松一点。</p>
         ) : (
           <div className="space-y-3">
             {myToday.map((t) => (
@@ -338,9 +344,9 @@ function MineView({
 
       {/* 接下来要做 */}
       {myUpcoming.length > 0 && (
-        <section>
+        <section className="petal-card p-6 md:p-8">
           <div className="flex items-baseline justify-between mb-5">
-            <h2 className="font-serif text-h3 text-ink-900">接下来要做</h2>
+            <h2 className="font-serif text-h3 text-ink-900">接下来可以陪着完成</h2>
             <span className="text-tiny text-ink-500">{myUpcoming.length} 件</span>
           </div>
           <div className="space-y-3">
@@ -359,16 +365,16 @@ function MineView({
 
       {/* 待分配 · 我发起的、还没派出去的事 */}
       {myDrafts.length > 0 && (
-        <section>
+        <section className="petal-card p-6 md:p-8">
           <div className="flex items-baseline justify-between mb-5">
             <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
-              <Bell size={16} className="text-rouge-500" />
-              待分配
+              <Heart size={16} className="text-rouge-500" />
+              还想请家人搭把手
             </h2>
             <span className="text-tiny text-ink-500">{myDrafts.length} 件</span>
           </div>
           <p className="text-tiny text-ink-500 mb-4">
-            你发起、还没派给别人的事。打开 → 点「全部按 AI 推荐指派」就好。其他家人现在还看不到。
+            这些是你先记下的牵挂。打开后，可以温柔地请一位方便的家人一起照看。
           </p>
           <div className="space-y-3">
             {myDrafts.map((t) => (
@@ -385,16 +391,16 @@ function MineView({
 
       {/* 待确认 · 别人派给我，等我点"我接手" */}
       {waitingOnMe.length > 0 && (
-        <section>
+        <section className="petal-card p-6 md:p-8">
           <div className="flex items-baseline justify-between mb-5">
             <h2 className="font-serif text-h3 text-ink-900 inline-flex items-center gap-2">
-              <Bell size={16} className="text-rouge-500" />
-              待确认
+              <Heart size={16} className="text-rouge-500" />
+              家人正在等你的回应
             </h2>
             <span className="text-tiny text-ink-500">{waitingOnMe.length} 件</span>
           </div>
           <p className="text-tiny text-ink-500 mb-4">
-            别人派给你的事，等你点「我接手」。
+            有人想到你可能方便帮忙。你可以答应，也可以坦白说最近不方便。
           </p>
           <div className="space-y-3">
             {waitingOnMe.map((t) => (
@@ -410,7 +416,7 @@ function MineView({
       )}
 
       {isEmpty && (
-        <div className="border-t border-ink-200 pt-12 text-center text-small text-ink-500">
+        <div className="petal-card p-10 text-center text-small text-ink-500">
           你这边今天没什么要紧的事。
           <div className="mt-2">
             <Link to="/overview" className="text-rouge-500 hover:text-rouge-700">
@@ -435,10 +441,10 @@ function ElderTaskCard({
     <button
       onClick={onClick}
       className={cn(
-        'block w-full text-left bg-paper-50 border-l-4 px-8 py-7 hover:bg-paper-100 transition',
+        'block w-full text-left bg-paper-50 rounded-3xl border px-8 py-7 hover:bg-paper-100 transition shadow-soft',
         task.status === 'fallback_risk' || task.status === 'needs_owner'
-          ? 'border-rouge-500'
-          : 'border-ink-700',
+          ? 'border-rouge-200'
+          : 'border-paper-200',
       )}
     >
       <h3 className="font-serif text-h2 text-ink-900 leading-tight">{task.title}</h3>
@@ -448,7 +454,7 @@ function ElderTaskCard({
         </div>
       )}
       <div className="mt-4 text-lead text-ink-700">
-        点开 → 看要做的步骤，完成后拍张照片
+        点开看看怎么照应，完成后可以留张照片
       </div>
     </button>
   )
@@ -477,8 +483,8 @@ function AllView({
   }, [tasks, tab])
 
   return (
-    <div className="max-w-6xl mx-auto px-8 lg:px-12 pb-20">
-      <div className="flex items-center gap-6 mb-10 border-b border-ink-200">
+    <div className="max-w-6xl mx-auto px-6 lg:px-12 pb-20">
+      <div className="flex flex-wrap items-center gap-2 mb-8">
         {CATEGORY_TABS.map((c) => {
           const count =
             c.id === 'all'
@@ -490,10 +496,10 @@ function AllView({
               key={c.id}
               onClick={() => setTab(c.id)}
               className={cn(
-                'text-small transition pb-3 -mb-px border-b-2 inline-flex items-center gap-2',
+                'text-small transition px-4 py-2 rounded-full inline-flex items-center gap-2',
                 tab === c.id
-                  ? 'text-ink-900 font-medium border-rouge-500'
-                  : 'text-ink-500 hover:text-ink-900 border-transparent',
+                  ? 'text-white font-medium bg-rouge-500 shadow-soft'
+                  : 'text-ink-500 bg-paper-50 border border-paper-200 hover:text-ink-900',
               )}
             >
               {c.label}
@@ -505,7 +511,7 @@ function AllView({
 
       {filtered.length === 0 ? (
         <div className="text-center py-16 text-small text-ink-500">
-          这个分类下没有任务
+          这里暂时没有需要留意的事
         </div>
       ) : (
         <div className="space-y-3">

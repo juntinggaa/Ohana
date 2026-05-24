@@ -1,5 +1,6 @@
 import type {
   CareTask,
+  HouseholdMemory,
   FamilyMember,
   RawMessage,
   ResponsibilityRisk,
@@ -52,7 +53,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     avatarColor: 'bg-moss-600 text-white',
     city: '南京',
     capacity: 'medium',
-    notes: '31 岁 · 与父母同城 · 习惯被安排好以后执行',
+    notes: '31 岁 · 与父母同城 · 被直接问到时很愿意帮忙',
     traits: ['同城父母', '可跑腿', '会陪诊', '能买药', '不擅长发起'],
     uiMode: 'standard',
   },
@@ -168,6 +169,27 @@ export const FAMILY_CHAT_RAW = [
   '[私聊] 今天 11:30 · 妈妈：你爸今天早上血压 148/92，要紧吗？',
 ].join('\n')
 
+export const SAMPLE_HOUSEHOLD_MEMORIES: HouseholdMemory[] = [
+  {
+    id: 'memory-medical-card',
+    title: '医药卡在哪里',
+    detail: '爸爸的医药卡放在玄关柜第二层的蓝色文件袋里。',
+    category: 'location',
+    keywords: ['医药卡', '医保卡', '医疗卡', '就诊卡'],
+    createdAt: Date.now(),
+    createdById: 'mom',
+  },
+  {
+    id: 'memory-follow-up-list',
+    title: '复诊要带什么',
+    detail: '爸爸复诊时带医药卡、医院预约通知和最近的用药记录。',
+    category: 'appointment',
+    keywords: ['复诊', '看病', '门诊', '预约', '医药卡'],
+    createdAt: Date.now(),
+    createdById: 'mom',
+  },
+]
+
 /* -------------------------------------------------------------------------- */
 /* 任务示例 · 用于"识别后"的展示                                              */
 /* -------------------------------------------------------------------------- */
@@ -197,7 +219,7 @@ export const SAMPLE_TASKS: CareTask[] = [
     ],
     requiredProof: ['药品照片', '小票或订单截图'],
     aiExplanation:
-      '这条消息看起来像随口提一下，但它是一个真正的任务：父亲降压药不能断。"收到"不等于承接 —— 建议弟弟正式确认时间和完成证明，让任务真的落下来。',
+      '这句随口的提醒里藏着担心：父亲的降压药不能断。可以温柔地问问弟弟是否方便确认时间，并在药送到后给家里一声回音。',
     riskNotes: [
       '弟弟回复"收到"后还没正式确认时间和证明',
       '不补齐这两项，药真断了就晚了',
@@ -230,7 +252,7 @@ export const SAMPLE_TASKS: CareTask[] = [
     ],
     requiredProof: ['处方照片', '缴费单照片', '调药后的药盒照片'],
     aiExplanation:
-      '这是一条标准复诊任务，唐宁完全可以不出现在现场。系统已自动拆成"前一晚 / 当天 / 之后"三段，每段由不同的人承接，把唐宁从"全流程负责"降到"只做事后报销"。',
+      '复诊需要提前准备、当天陪伴和之后留存记录。家人可以各自陪一小段，让唐宁不用从头到尾独自操心。',
     riskNotes: [
       '没人确认弟弟是否周一请假',
       '检查单可能拿成上次的心电图（妈妈历史易混）',
@@ -258,7 +280,7 @@ export const SAMPLE_TASKS: CareTask[] = [
     ],
     requiredProof: ['年检合格证照片'],
     aiExplanation:
-      '家务任务里最容易"想到 → 忘了 → 罚款"的一类。我们把它从唐宁脑子里搬出来，明确指派周勉，并要求一张合格证照片作为完成证据。',
+      '家中年检很容易在忙碌里忘掉。可以问问在家的周勉是否方便接待师傅，最后分享一张合格证照片让大家放心。',
     riskNotes: ['不约就要等下一波 · 罚单更麻烦'],
   },
   {
@@ -304,7 +326,7 @@ export const SAMPLE_TASKS: CareTask[] = [
     ],
     requiredProof: ['更换后的血压读数截图'],
     aiExplanation:
-      '这是一个典型的"还没说出口的任务" —— 它只存在于唐宁的脑子里。系统的工作之一就是把这些后台任务挖出来，让它们有名字、有负责人。',
+      '这是唐宁一直放在心里的小事。把它说出来后，家人才有机会主动陪着完成。',
     riskNotes: ['一直只在唐宁脑中，从未说出口'],
   },
 ]
@@ -320,7 +342,7 @@ export const SAMPLE_RISKS: ResponsibilityRisk[] = [
     personId: 'bro',
     type: 'vague_acknowledgement',
     severity: 'high',
-    message: '弟弟仅回复"收到"，还没确认截止时间和完成证明',
+    message: '弟弟回复了"收到"，也许还可以问问什么时候方便完成',
     suggestedPrompt:
       '请弟弟确认：「明天中午前完成 + 上传药品照片到家庭群」？',
   },

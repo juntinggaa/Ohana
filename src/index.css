@@ -1,5 +1,5 @@
-/* Editorial typography · 衬线标题 + 干净的中文正文 */
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+/* Soft, readable type with a handwritten warmth in the display moments. */
+@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@400;500;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -13,54 +13,79 @@
     @apply bg-paper text-ink-900 font-sans antialiased;
     font-feature-settings: "ss01", "cv02", "cv03", "tnum";
     text-rendering: optimizeLegibility;
+    background-image:
+      radial-gradient(circle at 8% 12%, rgba(245, 200, 190, 0.34), transparent 28rem),
+      radial-gradient(circle at 94% 8%, rgba(252, 236, 200, 0.46), transparent 26rem),
+      radial-gradient(circle at 48% 100%, rgba(223, 236, 220, 0.3), transparent 32rem);
+    background-attachment: fixed;
   }
   ::selection {
-    background: theme('colors.rouge.100');
+    background: theme('colors.rouge.200');
     color: theme('colors.ink.900');
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='file']),
+  textarea,
+  select {
+    border-radius: 0.9rem;
+    transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):focus,
+  textarea:focus,
+  select:focus {
+    box-shadow: 0 0 0 3px rgba(245, 200, 190, 0.38);
   }
 }
 
 @layer components {
-  /* 编辑风的眉头 —— 全大写 + letter spacing */
   .eyebrow {
-    @apply text-eyebrow uppercase tracking-widest text-ink-500 font-medium;
+    @apply text-eyebrow text-rouge-600 font-medium;
   }
-  /* 衬线大标题 */
   .display-serif {
     @apply font-serif text-ink-900;
     font-weight: 500;
   }
-  /* 卡片 · 不再有夸张阴影，只有一根细线 */
   .panel {
-    @apply bg-paper-50 rounded-none border-t border-ink-200 py-8;
+    @apply bg-paper-50 rounded-3xl border border-paper-200 p-8 shadow-soft;
   }
   .card {
-    @apply bg-paper-50 border border-ink-200 p-6;
+    @apply bg-paper-50 rounded-2xl border border-paper-200 p-6 shadow-soft;
   }
   .card-flat {
-    @apply bg-paper-50 border-t border-ink-200 py-6;
+    @apply bg-paper-50 rounded-2xl border border-paper-200 p-6;
   }
-  /* 按钮 —— 长方形，朴素 */
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 text-small font-medium transition;
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-full text-small font-medium transition;
   }
   .btn-primary {
-    @apply btn bg-ink-900 text-paper hover:bg-ink-800;
+    @apply btn bg-rouge-500 text-white shadow-soft hover:bg-rouge-600;
   }
   .btn-ghost {
-    @apply btn text-ink-700 hover:bg-ink-100;
+    @apply btn text-ink-700 hover:bg-paper-100;
   }
   .btn-rouge {
-    @apply btn bg-rouge-500 text-paper hover:bg-rouge-600;
+    @apply btn bg-rouge-500 text-white shadow-soft hover:bg-rouge-600;
   }
   .btn-outline {
-    @apply btn border border-ink-300 text-ink-700 hover:bg-ink-100;
+    @apply btn border border-paper-200 bg-paper-50 text-ink-700 hover:border-rouge-200 hover:bg-rouge-50;
   }
-  /* 横向细分隔 */
+  .segmented {
+    @apply inline-flex rounded-full border border-paper-200 bg-paper-50 p-1 shadow-soft;
+  }
+  .segment {
+    @apply inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-tiny text-ink-600 transition;
+  }
+  .segment-active {
+    @apply bg-rouge-500 text-white shadow-soft;
+  }
+  .home-note {
+    @apply rounded-2xl border border-paper-200 bg-paper-50 p-5 shadow-soft;
+  }
+  .petal-card {
+    @apply rounded-3xl border border-rouge-100 bg-paper-50 shadow-card;
+  }
   .rule {
     @apply h-px bg-ink-200;
   }
-  /* 数字 · oldstyle, tabular */
   .num {
     font-family: theme('fontFamily.numeric');
     font-variant-numeric: tabular-nums oldstyle-nums;
@@ -68,8 +93,7 @@
   }
 }
 
-/* 细滚动条 */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: theme('colors.ink.200'); border-radius: 0; }
+::-webkit-scrollbar-thumb { background: theme('colors.ink.200'); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: theme('colors.ink.300'); }

@@ -5,8 +5,7 @@ import { Avatar } from './Avatar'
 import { cn } from '@/lib/utils'
 
 /**
- * 小巧的执行人选择器 —— 用在子任务行内
- * 没选时显示一个虚框 + "指派"，选了显示 avatar + 名字
+ * Choose a family member who may be able to help with one small step.
  */
 export function OwnerPicker({
   value,
@@ -41,7 +40,7 @@ export function OwnerPicker({
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'inline-flex items-center gap-1.5 px-1.5 py-0.5 border transition text-tiny',
+          'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border transition text-tiny',
           current
             ? 'border-ink-200 bg-paper hover:border-ink-500'
             : 'border-dashed border-ink-300 text-ink-500 hover:border-ink-500',
@@ -55,16 +54,16 @@ export function OwnerPicker({
         ) : suggested ? (
           <>
             <Avatar member={suggested} size={px} className="opacity-50" />
-            <span className="italic text-ink-400">建议 {suggested.name}</span>
+            <span className="italic text-ink-400">可问 {suggested.name}</span>
           </>
         ) : (
-          <span className="px-1">+ 指派</span>
+          <span className="px-1">+ 请人帮忙</span>
         )}
         <ChevronDown size={10} className="text-ink-400" />
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 min-w-[180px] bg-paper border border-ink-200 shadow-card z-50 animate-fade-in">
+        <div className="absolute right-0 mt-2 min-w-[180px] rounded-2xl overflow-hidden bg-paper-50 border border-paper-200 shadow-card z-50 animate-fade-in">
           <ul className="max-h-64 overflow-y-auto">
             {members.map((m) => {
               const isSuggested = m.id === suggestedId
@@ -84,7 +83,7 @@ export function OwnerPicker({
                     <Avatar member={m} size={20} />
                     <span className="flex-1 text-ink-900">{m.name}</span>
                     {isSuggested && (
-                      <span className="text-micro text-ink-400 italic">AI 建议</span>
+                      <span className="text-micro text-ink-400 italic">可能方便</span>
                     )}
                   </button>
                 </li>
@@ -100,7 +99,7 @@ export function OwnerPicker({
               className="w-full flex items-center gap-2 px-3 py-2 text-tiny text-ink-500 hover:bg-paper-50 border-t border-ink-100"
             >
               <X size={10} />
-              清空指派
+              暂不请人
             </button>
           )}
         </div>

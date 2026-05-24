@@ -46,7 +46,7 @@ export function ResponsibilityTransferPanel({
     return (
       <div className="border-t border-ink-200 pt-10 text-center">
         <p className="text-small text-ink-500 max-w-md mx-auto">
-          没有发现风险任务。所有任务都已经有人承接 + 有截止 + 有证明。
+          现在没有悬在心里的事，家里的牵挂都有了回应。
         </p>
       </div>
     )
@@ -56,10 +56,10 @@ export function ResponsibilityTransferPanel({
     <div className="space-y-6">
       <div>
         <h2 className="font-serif text-h2 text-ink-900 leading-tight">
-          {risks.length} 条家里可以一起补一下
+          {risks.length} 件事可以再问候一下
         </h2>
         <p className="mt-2 text-small text-ink-500 max-w-xl">
-          不是责怪谁 —— 只是有些事还缺时间或者证明。补上一句，任务就真的落下来。
+          不是催谁，只是轻轻确认一句，让惦记的人能够放心。
         </p>
       </div>
 

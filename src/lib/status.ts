@@ -1,7 +1,7 @@
 /**
  * 统一的「三色」状态系统 · green / yellow / red
  *
- * 整个 app 的所有任务卡 / 徽章 / 边框都用这个 map，避免色彩泛滥。
+ * All care cards share one calm status vocabulary and palette.
  */
 
 import type { CareTask, SimpleStatusTone, TaskStatus } from './types'
@@ -58,17 +58,14 @@ const NEUTRAL: Pick<StatusVisual, 'tone' | 'textCls' | 'borderCls' | 'softBgCls'
  * 转移到卡片里的二级文字（"现在落在 XXX" / "只回了收到" 提示）。
  */
 const STATUS_VISUAL: Record<TaskStatus, StatusVisual> = {
-  // 待分配 · 发起人需要安排 · 三种内部状态统一显示
-  detected:           { ...RED,     simpleLabel: '待分配', proLabel: '待分配' },
-  needs_owner:        { ...RED,     simpleLabel: '待分配', proLabel: '待分配' },
-  fallback_risk:      { ...RED,     simpleLabel: '待分配', proLabel: '待分配' },
-  // 待确认 · 已经派给某人，等他/她点"我接手"
-  pending_acceptance: { ...YELLOW,  simpleLabel: '待确认', proLabel: '待确认' },
-  // 已承接 / 已完成
-  accepted:           { ...GREEN,   simpleLabel: '已承接', proLabel: '已承接' },
-  in_progress:        { ...GREEN,   simpleLabel: '已承接', proLabel: '已承接' },
-  needs_proof:        { ...YELLOW,  simpleLabel: '待证明', proLabel: '待证明' },
-  completed:          { ...NEUTRAL, simpleLabel: '已完成', proLabel: '已完成' },
+  detected:           { ...RED,     simpleLabel: '待关照', proLabel: '待关照' },
+  needs_owner:        { ...RED,     simpleLabel: '待关照', proLabel: '待关照' },
+  fallback_risk:      { ...RED,     simpleLabel: '待关照', proLabel: '待关照' },
+  pending_acceptance: { ...YELLOW,  simpleLabel: '等回应', proLabel: '等回应' },
+  accepted:           { ...GREEN,   simpleLabel: '有人陪着', proLabel: '有人陪着' },
+  in_progress:        { ...GREEN,   simpleLabel: '有人陪着', proLabel: '有人陪着' },
+  needs_proof:        { ...YELLOW,  simpleLabel: '等回音', proLabel: '等回音' },
+  completed:          { ...NEUTRAL, simpleLabel: '安心了', proLabel: '安心了' },
 }
 
 export function statusVisualFor(s: TaskStatus): StatusVisual {

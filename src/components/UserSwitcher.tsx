@@ -36,16 +36,13 @@ export function UserSwitcher() {
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'inline-flex items-center gap-2 px-2 py-1 border transition',
+          'inline-flex items-center gap-2 px-2.5 py-1.5 rounded-full border transition bg-paper-50',
           open
             ? 'border-ink-700 bg-paper-100'
             : 'border-ink-200 hover:border-ink-400',
         )}
         aria-label="切换查看身份"
       >
-        <span className="text-eyebrow uppercase tracking-widest text-ink-400 hidden md:inline">
-          以
-        </span>
         <Avatar member={current} size={20} />
         <span className="text-tiny font-medium text-ink-900">{current.name}</span>
         <span className="text-tiny text-ink-400 hidden md:inline">的身份</span>
@@ -53,11 +50,11 @@ export function UserSwitcher() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 min-w-[240px] bg-paper border border-ink-200 shadow-card z-50 animate-fade-in">
-          <div className="px-3 py-2 border-b border-ink-100">
-            <div className="eyebrow">现在以谁的身份查看</div>
+        <div className="absolute right-0 mt-2 min-w-[240px] bg-paper-50 rounded-2xl overflow-hidden border border-paper-200 shadow-card z-50 animate-fade-in">
+          <div className="px-3 py-3 border-b border-paper-200">
+            <div className="eyebrow">现在听谁的近况</div>
             <div className="text-tiny text-ink-500 mt-1 leading-snug">
-              演示用：切换后看到的任务、通知、按钮全部从那个人的视角出发。
+              切换后，会从这位家人的视角看到需要留意的事。
             </div>
           </div>
           <ul className="max-h-72 overflow-y-auto">

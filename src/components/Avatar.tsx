@@ -1,7 +1,7 @@
 import { cn } from '@/lib/utils'
 import type { FamilyMember } from '@/lib/types'
 
-// 把原本的 tailwind class 重新映射到 editorial 调色板
+// Map older sample colors into the soft household palette.
 const COLOR_MAP: Record<string, string> = {
   'bg-ember-600 text-white':  'bg-rouge-500 text-paper',
   'bg-ink-700 text-white':    'bg-ink-800 text-paper',
@@ -25,11 +25,11 @@ export function Avatar({
   return (
     <div
       className={cn(
-        'inline-flex items-center justify-center font-medium shrink-0 font-serif',
+        'inline-flex items-center justify-center font-medium shrink-0 font-serif shadow-soft',
         color,
         className,
       )}
-      style={{ width: px, height: px, fontSize: size * 0.45, borderRadius: '2px' }}
+      style={{ width: px, height: px, fontSize: size * 0.45, borderRadius: '9999px' }}
       title={`${member.name} · ${member.relation}`}
     >
       {member.name.slice(-1)}

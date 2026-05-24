@@ -13,14 +13,14 @@ export function SettingsPage() {
   const pushToast = useAppStore((s) => s.pushToast)
 
   function handleReset() {
-    if (confirm('确定重置为唐宁家示例数据吗？当前所有承接和修改会丢失。')) {
+    if (confirm('确定回到唐宁家示例吗？当前留下的近况和回应会清空。')) {
       resetToSampleData()
       pushToast('已重置为示例家庭', 'info')
     }
   }
 
   function handleClear() {
-    if (confirm('确定清空所有任务和承接记录吗？')) {
+    if (confirm('确定清空所有家庭记忆和照应记录吗？')) {
       clearAll()
       pushToast('数据已清空', 'info')
     }
@@ -28,38 +28,38 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="设置" description="数据、AI 模型、调试与演示模式入口。" />
+      <PageHeader title="设置" description="管理家庭资料、辅助功能与演示入口。" />
 
-      <div className="max-w-3xl mx-auto px-8 lg:px-12 pb-20 space-y-12">
+      <div className="max-w-3xl mx-auto px-6 lg:px-12 pb-20 space-y-5">
         {/* AI 连接 */}
-        <section className="border-t border-ink-200 pt-8">
-          <h2 className="font-serif text-h3 text-ink-900 mb-4">AI 模型</h2>
+        <section className="petal-card p-6 md:p-8">
+          <h2 className="font-serif text-h3 text-ink-900 mb-4">智能辅助</h2>
           <div className="space-y-2 text-small">
             <Row
-              label="DeepSeek · 任务识别"
+              label="OpenRouter · 消息整理"
               value={
                 hasDeepSeekKey() ? (
-                  <span className="text-moss-500">已连接 · deepseek-chat</span>
+                  <span className="text-moss-500">已连接 · deepseek/deepseek-chat (v3)</span>
                 ) : (
-                  <span className="text-ink-400">未配置（.env 缺 VITE_DEEPSEEK_API_KEY）</span>
+                  <span className="text-ink-400">未配置（.env 缺 VITE_OPENROUTER_API_KEY）</span>
                 )
               }
             />
             <Row
-              label="Mistral · OCR"
+              label="OCR.space · 图片识别"
               value={
                 hasMistralKey() ? (
-                  <span className="text-moss-500">已连接 · mistral-ocr-latest</span>
+                  <span className="text-moss-500">已连接 · OCR Engine 2 · 简体中文</span>
                 ) : (
-                  <span className="text-ink-400">未配置（.env 缺 VITE_MISTRAL_API_KEY）</span>
+                  <span className="text-ink-400">未配置（.env 缺 VITE_OCR_SPACE_API_KEY）</span>
                 )
               }
             />
             <Row
-              label="工作链路"
+              label="图片整理方式"
               value={
                 hasMistralKey() && hasDeepSeekKey()
-                  ? '图片/PDF → Mistral OCR → DeepSeek 任务识别'
+                  ? '图片 → OCR.space → OpenRouter (DeepSeek-V3) 整理关键信息'
                   : '回退到本地确定性逻辑'
               }
             />
@@ -69,22 +69,22 @@ export function SettingsPage() {
             <br />
             黑客松结束后请到{' '}
             <a
-              href="https://platform.deepseek.com"
+              href="https://openrouter.ai/keys"
               target="_blank"
               rel="noreferrer"
               className="text-rouge-500 underline underline-offset-4 inline-flex items-center gap-1"
             >
-              DeepSeek 控制台
+              OpenRouter 控制台
               <ExternalLink size={10} />
             </a>
             和{' '}
             <a
-              href="https://console.mistral.ai"
+              href="https://ocr.space/ocrapi"
               target="_blank"
               rel="noreferrer"
               className="text-rouge-500 underline underline-offset-4 inline-flex items-center gap-1"
             >
-              Mistral 控制台
+              OCR.space 控制台
               <ExternalLink size={10} />
             </a>{' '}
             轮换密钥。
@@ -92,11 +92,11 @@ export function SettingsPage() {
         </section>
 
         {/* 数据 */}
-        <section className="border-t border-ink-200 pt-8">
-          <h2 className="font-serif text-h3 text-ink-900 mb-4">数据</h2>
+        <section className="petal-card p-6 md:p-8">
+          <h2 className="font-serif text-h3 text-ink-900 mb-4">你的家庭资料</h2>
           <div className="space-y-2 text-small mb-6">
-            <Row label="当前任务数" value={tasks.length} />
-            <Row label="已承接记录" value={Object.keys(accepted).length} />
+            <Row label="正在留意的事" value={tasks.length} />
+            <Row label="家人的回应" value={Object.keys(accepted).length} />
             <Row label="存储位置" value="浏览器 localStorage · 键 ohana:v1" />
           </div>
           <div className="flex flex-wrap gap-3">
@@ -112,7 +112,7 @@ export function SettingsPage() {
         </section>
 
         {/* 演示 */}
-        <section className="border-t border-ink-200 pt-8">
+        <section className="petal-card p-6 md:p-8">
           <h2 className="font-serif text-h3 text-ink-900 mb-4">演示与文档</h2>
           <div className="space-y-3">
             <Link
@@ -123,13 +123,13 @@ export function SettingsPage() {
               打开演讲模式（黑客松路演用）
             </Link>
             <p className="text-tiny text-ink-500">
-              演讲模式是一组 9 张全屏幻灯，用 ←/→/Space/Esc 键控制。它读静态数据，不会影响你当前的任务列表。
+              演讲模式是一组 9 张全屏幻灯，用 ←/→/Space/Esc 键控制。它读静态数据，不会影响当前家庭内容。
             </p>
           </div>
         </section>
 
         {/* 关于 */}
-        <section className="border-t border-ink-200 pt-8">
+        <section className="petal-card p-6 md:p-8">
           <h2 className="font-serif text-h3 text-ink-900 mb-4">关于</h2>
           <p className="text-small text-ink-600 leading-relaxed">
             欧哈娜 · Ohana · v0.3.0
@@ -146,7 +146,7 @@ export function SettingsPage() {
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[160px_1fr] gap-4 py-2 border-b border-ink-100">
+    <div className="grid grid-cols-[160px_1fr] gap-4 py-2 border-b border-paper-200">
       <span className="text-ink-500">{label}</span>
       <span className="text-ink-900">{value}</span>
     </div>

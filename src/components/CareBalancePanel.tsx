@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 function describeLoad(percentage: number): { label: string; tone: 'busy' | 'ok' | 'rest' } {
   if (percentage >= 0.45) return { label: '最近比较辛苦', tone: 'busy' }
   if (percentage >= 0.2) return { label: '在帮忙一些事', tone: 'ok' }
-  return { label: '本周比较空', tone: 'rest' }
+  return { label: '这周比较轻松', tone: 'rest' }
 }
 
 export function CareBalancePanel() {
@@ -87,7 +87,7 @@ export function CareBalancePanel() {
       <div>
         <div className="eyebrow mb-4 inline-flex items-center gap-1.5">
           <Sparkles size={11} />
-          谁最近比较辛苦
+          可以先关心谁
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedLoad
@@ -121,7 +121,7 @@ export function CareBalancePanel() {
                   <div className="text-tiny text-ink-600">{d.label}</div>
                   {d.tone === 'busy' && (
                     <div className="text-tiny text-ink-500 mt-1 leading-snug">
-                      处理了较多提醒和跟进。
+                      心里记着的事情有些多了。
                     </div>
                   )}
                 </div>
@@ -133,7 +133,7 @@ export function CareBalancePanel() {
       {/* 下周可以怎么分担 */}
       {suggestions.length > 0 && (
         <div>
-          <div className="eyebrow mb-4">下周可以怎么分担</div>
+          <div className="eyebrow mb-4">可以怎样陪彼此轻松一点</div>
           <ul className="space-y-3">
             {suggestions.map((s) => (
               <li
@@ -142,12 +142,12 @@ export function CareBalancePanel() {
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-body text-ink-800 leading-relaxed">
-                    下周可以试着把
-                    <span className="font-medium text-ink-900"> {s.taskTitle} </span>
-                    交给
+                    也许可以请
                     <span className="inline-flex items-center gap-1.5 mx-1 align-middle">
                       <MemberPill id={s.toMemberId} size="xs" />
                     </span>
+                    陪着处理
+                    <span className="font-medium text-ink-900"> {s.taskTitle} </span>
                     。
                   </p>
                   <p className="text-tiny text-ink-500 mt-1.5 leading-snug">{s.reason}</p>
@@ -156,13 +156,13 @@ export function CareBalancePanel() {
                   onClick={() => handleAccept(s)}
                   className="btn-outline text-tiny shrink-0"
                 >
-                  记下来
+                  轻轻提醒
                 </button>
               </li>
             ))}
           </ul>
           <p className="text-tiny text-ink-500 mt-3">
-            这些是温和的建议 · 没有强制的指派，谁不方便都可以换。
+            这只是一个温柔的提议。谁最近累了，都可以诚实地说出来。
           </p>
         </div>
       )}

@@ -4,9 +4,9 @@ import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 
 const OPTIONS: { id: 'auto' | 'standard' | 'elder'; label: string; hint: string }[] = [
-  { id: 'auto',     label: '自动',     hint: '按当前身份自动切换 · 老人成员会自动进老人版' },
-  { id: 'standard', label: '标准',     hint: '家人通用 · 完整的事项、家庭总览、记忆助手' },
-  { id: 'elder',    label: '老人版',   hint: '大字 · 大按钮 · 只剩"今天要做"和"拍照上传"' },
+  { id: 'auto',     label: '贴心适配', hint: '按正在查看的家人自动调节文字和入口' },
+  { id: 'standard', label: '家庭版',   hint: '一起看看近况、牵挂和家庭记忆' },
+  { id: 'elder',    label: '大字版',   hint: '字更大、选择更少，轻松看清和回应' },
 ]
 
 export function ModeToggle() {
@@ -30,23 +30,20 @@ export function ModeToggle() {
       <button
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          'inline-flex items-center gap-1.5 px-2 py-1 border transition text-tiny',
+          'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-paper-50 border transition text-tiny',
           open ? 'border-ink-700 bg-paper-100' : 'border-ink-200 hover:border-ink-400',
         )}
         aria-label="切换界面模式"
         title="界面模式"
       >
-        <span className="text-eyebrow uppercase tracking-widest text-ink-400 hidden lg:inline">
-          模式
-        </span>
         <span className="text-ink-900 font-medium">{current.label}</span>
         <ChevronDown size={12} className="text-ink-400" />
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-1 min-w-[260px] bg-paper border border-ink-200 shadow-card z-50 animate-fade-in">
-          <div className="px-3 py-2 border-b border-ink-100">
-            <div className="eyebrow">界面模式</div>
+        <div className="absolute right-0 mt-2 min-w-[270px] rounded-2xl overflow-hidden bg-paper-50 border border-paper-200 shadow-card z-50 animate-fade-in">
+          <div className="px-3 py-3 border-b border-paper-200">
+            <div className="eyebrow">阅读方式</div>
             <div className="text-tiny text-ink-500 mt-1 leading-snug">
               不是身份等级 · 老人版只是字大一点、选项少一点。
             </div>

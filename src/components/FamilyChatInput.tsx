@@ -50,28 +50,28 @@ export function FamilyChatInput({ onCaptured }: Props) {
     <div className="space-y-4">
       {/* 模式切换 */}
       <div className="flex items-center justify-between gap-4">
-        <div className="inline-flex border border-ink-300">
+        <div className="segmented">
           <button
             className={
               mode === 'paste'
-                ? 'px-3 py-1.5 text-tiny bg-ink-900 text-paper'
-                : 'px-3 py-1.5 text-tiny text-ink-600 hover:text-ink-900'
+                ? 'segment segment-active'
+                : 'segment'
             }
             onClick={() => setMode('paste')}
             disabled={loading}
           >
-            粘贴文字
+            粘贴消息
           </button>
           <button
             className={
               mode === 'upload'
-                ? 'px-3 py-1.5 text-tiny bg-ink-900 text-paper'
-                : 'px-3 py-1.5 text-tiny text-ink-600 hover:text-ink-900'
+                ? 'segment segment-active'
+                : 'segment'
             }
             onClick={() => setMode('upload')}
             disabled={loading}
           >
-            上传图片 / PDF
+            图片 / PDF
           </button>
         </div>
         {mode === 'paste' && isSampleFamily && (
@@ -94,7 +94,7 @@ export function FamilyChatInput({ onCaptured }: Props) {
           <FileUploader onMarkdown={handleOcrMarkdown} onError={setOcrError} />
           {!hasMistralKey() && (
             <div className="text-tiny text-ink-500 border-l-2 border-ink-300 pl-3 py-1">
-              当前未配置 Mistral API Key，无法运行 OCR。请在 .env 添加 VITE_MISTRAL_API_KEY。
+              图片识别还未开启。需要时可在设置中配置 OCR。
             </div>
           )}
           {ocrError && (
@@ -125,18 +125,18 @@ export function FamilyChatInput({ onCaptured }: Props) {
             </div>
           )}
           <textarea
-            className="w-full h-72 bg-paper-50 border border-ink-200 p-5
+            className="w-full h-72 bg-paper border border-paper-200 p-5
                        font-mono text-small leading-relaxed text-ink-800
-                       focus:outline-none focus:border-ink-700 transition resize-none"
+                       focus:outline-none focus:border-rouge-300 transition resize-none"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="把你的家庭群、医院通知、学校群、物业短信粘进来&#10;&#10;每行一条消息，格式不限。AI 会按你自己的家人来推荐负责人。"
+            placeholder="把家庭群、医院提醒或学校通知带进来&#10;&#10;每行一句即可。欧哈娜会看看有没有需要家人一起关心的事。"
             disabled={loading}
           />
           <div className="flex items-center justify-between gap-4">
             <div className="text-tiny text-ink-500">
               {loading
-                ? 'AI 正在识别…'
+                ? '正在轻轻整理…'
                 : `${lineCount} 条消息 · 预计 1-2 秒`}
             </div>
             <button
@@ -145,7 +145,7 @@ export function FamilyChatInput({ onCaptured }: Props) {
               disabled={loading || !value.trim()}
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-              {loading ? '识别中' : 'AI 识别任务'}
+              {loading ? '整理中' : '帮我看看'}
             </button>
           </div>
         </>

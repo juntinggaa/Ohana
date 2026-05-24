@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { WeeklyMentalLoadSnapshot } from '@/lib/types'
 import { Avatar } from './Avatar'
-import { cn, formatPercent } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useAppStore } from '@/lib/store'
 
 interface Props {
@@ -38,45 +38,51 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
     ? members.find((m) => m.id === heaviest.memberId)
     : undefined
 
+  function gentleState(percentage: number): string {
+    if (percentage >= 0.45) return '牵挂得比较多'
+    if (percentage >= 0.2) return '正在帮着照应'
+    return '偶尔搭把手'
+  }
+
   return (
     <div className="space-y-8">
       {!bare && heaviestMember && (
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="max-w-xl">
-            <div className="eyebrow mb-3">这一段时间</div>
+            <div className="eyebrow mb-3">这一阵子</div>
             <p className="font-serif text-lead text-ink-900 leading-snug">
               {view === 'before'
-                ? `${heaviestMember.name} 处理了较多提醒和跟进事项。`
-                : `${heaviestMember.name} 的事项已经被分担一部分到其他家人。`}
+                ? `${heaviestMember.name} 心里装着比较多家里的事。`
+                : `${heaviestMember.name} 已经有人一起陪着分担了。`}
             </p>
             <p className="mt-2 text-small text-ink-600 leading-relaxed">
               {view === 'before'
-                ? '看看下面的分布，方便商量谁可以多接一些。'
-                : '剩下的部分，可以继续在家里轻轻商量。'}
+                ? '看见这份惦记，也许就知道该先问候谁。'
+                : '不用算得很清楚，只要别让一个人一直操心。'}
             </p>
           </div>
-          <div className="inline-flex border border-ink-300">
+          <div className="segmented">
             <button
               className={cn(
-                'px-4 py-2 text-tiny transition',
+                'segment',
                 view === 'before'
-                  ? 'bg-ink-900 text-paper'
+                  ? 'segment-active'
                   : 'text-ink-600 hover:text-ink-900',
               )}
               onClick={() => setView('before')}
             >
-              本周
+              现在
             </button>
             <button
               className={cn(
-                'px-4 py-2 text-tiny transition',
+                'segment',
                 view === 'after'
-                  ? 'bg-ink-900 text-paper'
+                  ? 'segment-active'
                   : 'text-ink-600 hover:text-ink-900',
               )}
               onClick={() => setView('after')}
             >
-              分担之后
+              一起照应后
             </button>
           </div>
         </div>
@@ -94,7 +100,7 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
             return (
               <div
                 key={`${view}-${e.memberId}`}
-                className="grid grid-cols-[120px_1fr_56px] items-center gap-4 animate-fade-up"
+                className="grid grid-cols-[92px_1fr] sm:grid-cols-[120px_1fr_100px] items-center gap-x-3 gap-y-1 sm:gap-4 animate-fade-up"
                 style={{ animationDelay: `${idx * 60}ms` }}
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -104,17 +110,17 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
                     <div className="text-micro text-ink-500 truncate">{m.relation}</div>
                   </div>
                 </div>
-                <div className="h-[3px] bg-ink-100 overflow-hidden origin-left">
+                <div className="h-2 rounded-full bg-paper-200 overflow-hidden origin-left">
                   <div
                     className={cn(
                       'h-full origin-left animate-bar-fill',
-                      isHeaviest ? 'bg-rouge-500' : 'bg-ink-700',
+                      isHeaviest ? 'bg-rouge-400' : 'bg-moss-400',
                     )}
                     style={{ width: `${width}%` }}
                   />
                 </div>
-                <div className="num text-small text-ink-900 text-right">
-                  {formatPercent(e.percentage)}
+                <div className="col-start-2 sm:col-start-auto text-tiny text-ink-500 sm:text-right">
+                  {gentleState(e.percentage)}
                 </div>
               </div>
             )
@@ -122,8 +128,8 @@ export function MentalLoadDashboard({ before, after, initialView = 'before', bar
       </div>
 
       {!bare && (
-        <div className="text-tiny text-ink-500 pt-6 border-t border-ink-200 whitespace-nowrap overflow-x-auto">
-          心力 = 想到 × 3 + 追问 × 2 + 核对 × 2 + 兜底 × 4 + 执行 × 1 · 兜底的权重最高，因为它是最容易看不到、却最磨人的那部分
+        <div className="text-small text-ink-500 pt-6 border-t border-paper-200">
+          这里不是比较谁做得多，而是提醒家人：有人可能正需要一句问候，或一次主动的帮忙。
         </div>
       )}
     </div>

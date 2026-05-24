@@ -41,9 +41,9 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
           personId: m.speakerId,
           type: 'vague_acknowledgement',
           severity: task.urgency,
-          message: `${m.speakerLabel}仅回复"${m.body}"，未确认截止时间和完成证明`,
+          message: `${m.speakerLabel}回复了"${m.body}"，也许还可以温柔地问问什么时候方便`,
           suggestedPrompt:
-            `是否要求${m.speakerLabel}确认：${task.dueDateText ?? '本周内'}前完成${
+            `可以问问${m.speakerLabel}：是否方便在${task.dueDateText ?? '本周内'}帮忙${
               task.requiredProof?.length
                 ? ` + 上传${task.requiredProof.join(' / ')}`
                 : ''
@@ -59,8 +59,8 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         taskId: task.id,
         type: 'missing_deadline',
         severity: 'medium',
-        message: `任务「${task.title}」没有明确截止时间`,
-        suggestedPrompt: '请发起人确认一个具体日期，否则任务会无限延期。',
+        message: `「${task.title}」还不知道什么时候能放心`,
+        suggestedPrompt: '可以在群里问一句：这件事大概什么时候方便照看好？',
       })
     }
 
@@ -75,8 +75,8 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         personId: task.executorId,
         type: 'missing_proof',
         severity: 'low',
-        message: `任务「${task.title}」未约定完成证明`,
-        suggestedPrompt: '建议在任务卡片加一条：完成后上传照片或截图。',
+        message: `「${task.title}」完成后还可以留一个让大家安心的回音`,
+        suggestedPrompt: '完成后方便分享一张照片或一句消息吗？大家会放心些。',
       })
     }
 
@@ -88,11 +88,11 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         personId: task.executorId ?? task.originatorId,
         type: 'fallback_to_originator',
         severity: 'high',
-        message: '这条又回到同一个人手上 · 可以正式交接一下',
+        message: '这份牵挂又落在同一个人心里了 · 可以问问谁有余裕',
         suggestedPrompt:
           task.suggestedOwnerId
-            ? `可以试着请${task.suggestedOwnerId === 'bro' ? '弟弟' : task.suggestedOwnerId}承接（含截止 + 证明），让任务真的落下来。`
-            : '可以家里轻轻商量一下：这条交给谁更合适。',
+            ? `可以问问${task.suggestedOwnerId === 'bro' ? '弟弟' : task.suggestedOwnerId}最近是否方便陪着处理，让惦记的人松一口气。`
+            : '可以在家里轻轻问一句：这次谁比较方便陪着处理？',
       })
     }
 
@@ -104,8 +104,8 @@ export function analyzeResponsibility(input: AccountabilityInput): Responsibilit
         personId: 'tangning',
         type: 'overloaded_originator',
         severity: 'high',
-        message: '同一个人最近处理了比较多家里的事 · 这条可以让别人接住',
-        suggestedPrompt: '可以试着改派给同城弟弟，或者在家的周勉。',
+        message: '同一个人最近心里装了比较多家里的事 · 也许需要有人主动帮一把',
+        suggestedPrompt: '可以先问问同城的弟弟，或者在家的周勉，最近是否方便帮忙。',
       })
     }
   })

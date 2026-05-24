@@ -52,35 +52,35 @@ const PATTERNS: Pattern[] = [
     match: [/药.*没/, /药.*快/, /处方/, /开药/, /配药/],
     category: 'elderly_care',
     urgency: 'high',
-    buildTitle: () => '老人药品补货',
+    buildTitle: () => '为长辈补好药品',
     requiredProof: ['药品照片', '小票或订单截图'],
   },
   {
     match: [/复诊/, /门诊/, /挂号/, /高血压/, /心电/, /检查/],
     category: 'medical',
     urgency: 'high',
-    buildTitle: () => '医院复诊安排',
+    buildTitle: () => '陪家人安心复诊',
     requiredProof: ['处方照片', '缴费单照片'],
   },
   {
     match: [/燃气/, /物业/, /年检/, /电表/, /水表/],
     category: 'household_admin',
     urgency: 'medium',
-    buildTitle: () => '物业 / 家务行政',
+    buildTitle: () => '家中检修提醒',
     requiredProof: ['合格证或完成单据照片'],
   },
   {
     match: [/幼儿园/, /学校/, /家长/, /手工/, /作品/, /家委/, /班级/],
     category: 'child_school',
     urgency: 'medium',
-    buildTitle: () => '孩子学校任务',
+    buildTitle: () => '陪孩子准备学校活动',
     requiredProof: ['完成现场照片'],
   },
   {
     match: [/报销/, /发票/, /缴费/, /票据/],
     category: 'reimbursement',
     urgency: 'low',
-    buildTitle: () => '票据 / 报销整理',
+    buildTitle: () => '留好家中的票据',
   },
 ]
 
@@ -184,11 +184,11 @@ export function captureTasksFromMessages(
       originatorId: detectOriginatorId(speakerLabel, context),
       suggestedOwnerId: confirmer?.id,
       suggestionReason: confirmer
-        ? `唐宁已经下单，不需要再派弟弟买药；${confirmer.name}在家确认收到并拍照反馈就好。`
+        ? `唐宁已经下单；可以问问${confirmer.name}是否方便在家确认收到并拍张照片，让大家安心。`
         : '唐宁已经下单，当前只需要确认药送到父母手上。',
       requiredProof: ['药品照片或签收截图'],
       aiExplanation:
-        '原本的补货风险已经被唐宁下单处理，现在剩下的是到货确认：药有没有按时送到、是否放到父母手上。',
+        '药已经下单了，现在只需要有人轻轻确认它按时送到父母手上。',
       dueDateText: dueTextFromDeliveryLine(matchedLine),
       matchedLine,
       matchedKeywords: ['药快没了', '下单', '到'],
@@ -216,7 +216,7 @@ export function captureTasksFromMessages(
         suggestedOwnerId: recommendation?.ownerId,
         suggestionReason: recommendation?.reason,
         requiredProof: p.requiredProof,
-        aiExplanation: `命中关键词：${matched.map((r) => r.source).join('、')}。`,
+        aiExplanation: `从消息里注意到：${matched.map((r) => r.source).join('、')}。这件事也许值得家人一起留意。`,
         matchedLine: line,
         matchedKeywords: matched.map((r) => r.source),
         confidence: Math.min(0.55 + matched.length * 0.15, 0.95),

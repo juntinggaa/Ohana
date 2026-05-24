@@ -249,3 +249,39 @@ export interface FamilyMemoryEntry {
   /** 同时通知了哪个家人（成员 id） */
   notifiedOwnerId?: string
 }
+
+/* -------------------------------------------------------------------------- */
+/* 家庭聊天与可检索记忆 · Conversation + household knowledge                  */
+/* -------------------------------------------------------------------------- */
+
+export type FamilyChatAudience = 'family' | 'assistant'
+
+export interface FamilyChatMessage {
+  id: string
+  role: 'family' | 'assistant'
+  speakerId?: string
+  audience: FamilyChatAudience
+  body: string
+  createdAt: number
+  /** 回答实际引用到的家庭记忆，便于界面说明来源。 */
+  memoryIds?: string[]
+}
+
+export type HouseholdMemoryCategory =
+  | 'location'
+  | 'appointment'
+  | 'health'
+  | 'routine'
+  | 'contact'
+  | 'other'
+
+export interface HouseholdMemory {
+  id: string
+  title: string
+  detail: string
+  category: HouseholdMemoryCategory
+  keywords: string[]
+  createdAt: number
+  createdById?: string
+  sourceMessageId?: string
+}

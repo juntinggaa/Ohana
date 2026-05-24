@@ -27,11 +27,11 @@ function buildMessage(
   const proof = task.requiredProof?.length
     ? `\n完成后请上传：${task.requiredProof.join(' / ')}`
     : ''
-  return `${ownerName}，关于「${task.title}」，需要你做的事：
+  return `${ownerName}，家里想请你一起照看「${task.title}」：
 ${lines}
-截止：${deadline}${place}${proof}
+希望时间：${deadline}${place}${proof}
 
-确认请回复"我来"或在 App 里点接受。`
+方便的话请回复"我来"，不方便也可以直接告诉家人。`
 }
 
 export function AssignAllModal({ task, onClose }: Props) {
@@ -94,7 +94,7 @@ export function AssignAllModal({ task, onClose }: Props) {
       pushNotification({
         recipientId: p.ownerId,
         kind: 'assignment',
-        message: `「${task.title}」已指给你 · ${p.subtaskTitles.length} 件事 · 截止 ${task.dueDateText ?? '本周内'}`,
+        message: `家里想请你一起照看「${task.title}」· ${p.subtaskTitles.length} 个小步骤 · 希望时间：${task.dueDateText ?? '本周内'}`,
         taskId: task.id,
       })
     })
@@ -110,21 +110,21 @@ export function AssignAllModal({ task, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-ink-900/30 backdrop-blur-sm flex items-stretch md:items-center md:justify-center p-0 md:p-6 animate-fade-in"
+      className="fixed inset-0 z-50 bg-ink-900/45 backdrop-blur-sm flex items-stretch md:items-center md:justify-center p-0 md:p-6 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full md:max-w-2xl bg-paper shadow-modal max-h-[92vh] overflow-y-auto"
+        className="w-full md:max-w-2xl bg-paper-50 border border-paper-200 rounded-none md:rounded-3xl shadow-modal max-h-[92vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-paper border-b border-ink-200 px-8 py-5 flex items-start justify-between gap-4 z-10">
+        <div className="sticky top-0 bg-paper-50 border-b border-paper-200 px-8 py-5 flex items-start justify-between gap-4 z-10">
           <div>
-            <div className="eyebrow">确认指派 · 生成通知</div>
+            <div className="eyebrow">邀请家人一起照看</div>
             <h2 className="font-serif text-h2 text-ink-900 mt-2 leading-tight">
               {packs.length} 份个性化消息已准备好
             </h2>
             <p className="text-small text-ink-500 mt-2 max-w-md">
-              每个人只看到 ta 自己那部分。先确认 / 复制 / 模拟发送，再标记已发出。
+              每个人只会看到适合自己的小步骤，也可以坦白说最近不方便。
             </p>
           </div>
           <button onClick={onClose} className="text-ink-500 hover:text-ink-900 p-1" aria-label="关闭">
@@ -135,21 +135,21 @@ export function AssignAllModal({ task, onClose }: Props) {
         <div className="px-8 py-6 space-y-4">
           {packs.length === 0 && (
             <div className="text-center py-10 text-small text-ink-500">
-              当前任务没有任何子任务分配出去。先在「行动清单」里给子任务指派负责人。
+              还没有选好可以问问谁。先在照应步骤中邀请一位方便的家人。
             </div>
           )}
 
           {packs.map((p) => {
             const member = members.find((m) => m.id === p.ownerId)
             return (
-              <div key={p.ownerId} className="border border-ink-200 bg-paper-50">
+              <div key={p.ownerId} className="rounded-2xl overflow-hidden border border-paper-200 bg-paper-50">
                 <div className="px-4 py-3 border-b border-ink-200 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     {member && <Avatar member={member} size={22} />}
                     <div className="text-small font-medium text-ink-900">
                       给 {p.ownerName}
                       <span className="ml-2 text-tiny text-ink-500 font-normal">
-                        {p.subtaskTitles.length} 件事
+                        {p.subtaskTitles.length} 个小步骤
                       </span>
                     </div>
                   </div>
@@ -215,12 +215,12 @@ export function AssignAllModal({ task, onClose }: Props) {
                 className="btn text-tiny border border-ink-200 text-ink-400 cursor-not-allowed inline-flex items-center gap-1.5"
               >
                 <Zap size={12} />
-                自动发送（待集成）
+                直接发送（待开启）
               </button>
             </div>
             <button onClick={handleMarkSent} className="btn-rouge text-tiny">
               <CheckCircle2 size={12} />
-              确认并标记已发送
+              好的，已经告诉大家
             </button>
           </div>
         )}

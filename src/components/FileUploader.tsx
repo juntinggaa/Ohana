@@ -20,7 +20,7 @@ export function FileUploader({ onMarkdown, onError, className }: Props) {
   async function handleFile(file: File) {
     if (busy) return
     if (!hasMistralKey()) {
-      onError('Mistral OCR 未配置 (.env 缺 VITE_MISTRAL_API_KEY)')
+      onError('OCR 未配置 (.env 缺 VITE_OCR_SPACE_API_KEY)')
       return
     }
     const kind = classifyFile(file)

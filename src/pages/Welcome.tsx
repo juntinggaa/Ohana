@@ -36,18 +36,18 @@ function inferTraits(d: DraftMember): string[] {
   if (d.capacity === 'flexible') traits.add('时间灵活')
   if (d.capacity === 'medium') traits.add('可协调时间')
   if (/伴侣|丈夫|妻子|老公|老婆/.test(d.relation)) {
-    traits.add('家务行政')
-    traits.add('日历可靠')
+    traits.add('会打理家中安排')
+    traits.add('会记住重要日子')
   }
   if (/弟弟|妹妹|哥哥|姐姐/.test(d.relation)) {
-    traits.add('可跑腿')
+    traits.add('方便帮忙跑一趟')
   }
   if (/妈妈|爸爸|母亲|父亲/.test(d.relation)) {
-    traits.add('了解家里状况')
-    traits.add('会拍照')
+    traits.add('熟悉家里近况')
+    traits.add('会分享照片')
   }
   if (/孩子|儿子|女儿/.test(d.relation)) {
-    traits.add('只能做简单事')
+    traits.add('适合轻松的小事')
   }
   return Array.from(traits)
 }
@@ -127,41 +127,42 @@ export function WelcomePage() {
     setFamily(members)
     setCurrentUser(me.isMe ? 'me' : members[0].id)
     dismissWelcome()
-    pushToast(`欢迎，${me.name} · 现在告诉 AI 你想记下什么`, 'success')
-    // 直接进 AI 对话页 —— 这是用户自有家庭的唯一任务入口
+    pushToast(`欢迎回家，${me.name} · 先留下一句近况吧`, 'success')
     navigate('/memory')
   }
 
   function useSampleFamily() {
     resetToSampleData()
     dismissWelcome()
-    pushToast('已载入唐宁家 · 先让 AI 从消息里识别任务', 'info')
+    pushToast('已打开唐宁家的示例 · 看看如何把牵挂接住', 'info')
     navigate('/memory?mode=paste')
   }
 
   return (
-    <div className="min-h-screen">
-      <div className="max-w-3xl mx-auto px-8 py-16">
+    <div className="min-h-screen relative overflow-hidden">
+      <div className="absolute -top-28 -right-28 w-80 h-80 rounded-full bg-rouge-100/55 blur-3xl" />
+      <div className="absolute bottom-16 -left-20 w-72 h-72 rounded-full bg-honey-100/55 blur-3xl" />
+      <div className="max-w-3xl mx-auto px-6 md:px-8 py-12 md:py-16 relative">
         <header className="mb-12">
-          <div className="eyebrow mb-4">欢迎</div>
-          <h1 className="font-serif text-h1 text-ink-900 leading-tight">
-            先把你的家放进来。
+          <div className="eyebrow mb-4">欢迎回家</div>
+          <h1 className="font-serif text-h1 md:text-display text-ink-900 leading-tight">
+            把牵挂的人，<br className="hidden sm:block" />轻轻放在一起。
           </h1>
-          <p className="mt-4 text-lead text-ink-600 max-w-xl">
-            欧哈娜只看你愿意告诉它的事 —— 哪些人、在哪、平时是不是有空。
-            <br />
-            <span className="text-tiny text-ink-500">
-              数据只存在你的浏览器，不会上传到任何地方。
-            </span>
+          <p className="mt-5 text-lead text-ink-600 max-w-xl leading-relaxed">
+            欧哈娜帮家人记住近况、问候与需要搭把手的小事。
+            先告诉我们家里有谁，之后一句话就能把关心留下来。
+          </p>
+          <p className="mt-4 inline-flex rounded-full bg-paper-50 border border-paper-200 px-4 py-2 text-tiny text-ink-500 shadow-soft">
+            你的家庭资料只留在当前浏览器里
           </p>
         </header>
 
-        <div className="space-y-3 mb-8">
+        <div className="space-y-4 mb-8">
           {drafts.map((d, idx) => (
-            <div key={d.id} className="border border-ink-200 bg-paper-50 p-4">
+            <div key={d.id} className="petal-card p-5 md:p-6">
               <div className="flex items-baseline justify-between mb-3">
-                <div className="text-tiny text-ink-500">
-                  {d.isMe ? '主用户（你）' : `家人 ${idx}`}
+                <div className="eyebrow">
+                  {d.isMe ? '从你开始' : `家人 ${idx}`}
                 </div>
                 {!d.isMe && (
                   <button
@@ -179,7 +180,7 @@ export function WelcomePage() {
                     type="text"
                     value={d.name}
                     onChange={(e) => update(d.id, { name: e.target.value })}
-                    className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
+                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
                     placeholder={d.isMe ? '你的名字' : '例如：妈妈 / 弟弟 / 伴侣'}
                   />
                 </Field>
@@ -192,7 +193,7 @@ export function WelcomePage() {
                         isMe: e.target.value === '我自己',
                       })
                     }
-                    className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
+                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
                   >
                     {RELATION_OPTIONS.map((r) => (
                       <option key={r} value={r}>
@@ -201,34 +202,34 @@ export function WelcomePage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="所在城市 (选填)">
+                <Field label="现在生活在哪里 (选填)">
                   <input
                     type="text"
                     value={d.city}
                     onChange={(e) => update(d.id, { city: e.target.value })}
-                    className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
+                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
                     placeholder="同你 / 上海 / 南京 ..."
                   />
                 </Field>
-                <Field label="时间情况 (选填)">
+                <Field label="最近的生活节奏 (选填)">
                   <select
                     value={d.capacity}
                     onChange={(e) => update(d.id, { capacity: e.target.value as CapacityTag })}
-                    className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
+                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
                   >
                     <option value="">未指定</option>
-                    <option value="busy">工作日很忙</option>
-                    <option value="medium">中等</option>
-                    <option value="flexible">在家时间多 / 退休</option>
+                    <option value="busy">最近比较忙，也需要被照顾</option>
+                    <option value="medium">平常节奏</option>
+                    <option value="flexible">最近比较有余裕</option>
                   </select>
                 </Field>
-                <Field label="备注 (选填)" className="md:col-span-2">
+                <Field label="想让家人记得的事 (选填)" className="md:col-span-2">
                   <input
                     type="text"
                     value={d.notes}
                     onChange={(e) => update(d.id, { notes: e.target.value })}
-                    className="w-full bg-paper border border-ink-300 px-3 py-2 text-body focus:border-ink-700 outline-none"
-                    placeholder="例如：高血压 · 不爱发消息 · 常说没事"
+                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
+                    placeholder="例如：最近在复诊 · 不太爱发消息 · 喜欢周末电话"
                   />
                 </Field>
               </div>
@@ -241,22 +242,22 @@ export function WelcomePage() {
           再加一个家人
         </button>
 
-        <div className="border-t border-ink-200 pt-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="border-t border-paper-200 pt-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <button onClick={useSampleFamily} className="btn-ghost">
             <Sparkles size={12} />
-            先用示例（唐宁家）演示
+            先看看一个家庭示例
           </button>
           <button onClick={finish} className={cn('btn-rouge')}>
-            建好了，开始用
+            一起回家看看
             <ArrowRight size={14} />
           </button>
         </div>
 
-        <div className="mt-12 text-tiny text-ink-500 leading-relaxed border-t border-ink-200 pt-6">
-          <strong className="text-ink-700">说明：</strong>
-          欧哈娜的 AI 用你提供的城市 + 时间情况，去推荐每件事谁来做更合适。
-          比如药品补货优先派给和老人同城的人；学校手工优先派给在家时间多的人。
-          你随时可以在 /family 页改成员信息，或在 /settings 重置。
+        <div className="mt-12 text-small text-ink-500 leading-relaxed rounded-2xl bg-honey-50 border border-honey-100 p-5">
+          <strong className="text-ink-700">为什么问城市和节奏？</strong>
+          <span className="block mt-1">
+            当家里真的需要陪诊、取药或接孩子时，欧哈娜才能温柔地建议谁比较方便搭把手，不让关心总落在一个人身上。
+          </span>
         </div>
       </div>
     </div>

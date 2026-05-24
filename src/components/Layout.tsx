@@ -11,19 +11,19 @@ import { useUiMode } from '@/lib/useUiMode'
 
 // 三个主视图 · 所有家人都能看到
 const NAV_PRIMARY = [
-  { to: '/me',       label: '事项' },
-  { to: '/overview', label: '家庭总览' },
-  { to: '/memory',   label: '家庭记忆' },
+  { to: '/me',       label: '为你留意' },
+  { to: '/overview', label: '我们的家' },
+  { to: '/memory',   label: '家里聊聊' },
 ]
 
 const NAV_SECONDARY = [
-  { to: '/family', label: '家人' },
+  { to: '/family', label: '家人小档案' },
 ]
 
 // 老人版 · 三个简单入口
 const NAV_ELDER = [
-  { to: '/me',     label: '今天' },
-  { to: '/memory', label: '告诉 AI' },
+  { to: '/me',     label: '今天好吗' },
+  { to: '/memory', label: '聊聊天' },
   { to: '/family', label: '家人' },
 ]
 
@@ -61,22 +61,22 @@ export function Layout() {
         isElder && 'text-[17px] leading-relaxed',
       )}
     >
-      <header className="border-b border-ink-200 bg-paper sticky top-0 z-30 backdrop-blur-sm bg-paper/95">
-        <div className="max-w-6xl mx-auto px-6 lg:px-12 h-16 flex items-center justify-between gap-4">
+      <header className="border-b border-paper-200 sticky top-0 z-30 backdrop-blur-md bg-paper/85">
+        <div className="max-w-6xl mx-auto px-5 lg:px-12 min-h-20 py-3 flex flex-wrap items-center justify-between gap-3">
           <Link to="/me" className="group shrink-0">
-            <Logo withWordmark size={32} />
+            <Logo withWordmark size={36} />
           </Link>
 
-          <nav className="flex items-center gap-1">
+          <nav className="order-3 w-full md:order-none md:w-auto flex items-center justify-start md:justify-center gap-0.5 md:gap-1 rounded-full bg-paper-50 border border-paper-200 p-1 overflow-x-auto">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
                 to={n.to}
                 className={({ isActive }) =>
                   cn(
-                    'px-2.5 lg:px-3 py-2 text-small transition',
+                    'whitespace-nowrap rounded-full px-1.5 py-2 text-[11px] sm:px-2 sm:text-tiny md:px-3 md:text-small lg:px-4 transition',
                     isActive
-                      ? 'text-ink-900 font-medium underline underline-offset-[10px] decoration-rouge-500 decoration-2'
+                      ? 'text-white font-medium bg-rouge-500 shadow-soft'
                       : 'text-ink-500 hover:text-ink-900',
                   )
                 }
@@ -90,14 +90,14 @@ export function Layout() {
             {/* AI status */}
             <span
               className={cn(
-                'inline-flex items-center gap-1.5 text-tiny',
+                'hidden lg:inline-flex items-center gap-1.5 text-tiny',
                 liveLLM ? 'text-moss-500' : 'text-ink-400',
               )}
               title={
                 liveLLM && liveOcr
-                  ? 'DeepSeek + Mistral OCR 都已连接'
+                  ? 'OpenRouter (DeepSeek-V3) + OCR.space 都已连接'
                   : liveLLM
-                    ? 'DeepSeek 已连接 · OCR 未配置'
+                    ? 'OpenRouter 已连接 · OCR 未配置'
                     : '本地确定性逻辑（未连接 LLM）'
               }
             >
@@ -113,17 +113,12 @@ export function Layout() {
             </span>
 
             <NotificationBell />
-            <ModeToggle />
+            <span className="hidden md:inline-flex">
+              <ModeToggle />
+            </span>
             <UserSwitcher />
 
-            <Link
-              to="/pitch"
-              className="text-tiny text-ink-500 hover:text-ink-900 inline-flex items-center gap-1.5 ml-1 px-2 py-1"
-              title="演讲模式 · 给评委用"
-            >
-              <Sparkles size={12} />
-            </Link>
-            <Link to="/settings" className="text-ink-500 hover:text-ink-900 p-1" aria-label="设置">
+            <Link to="/settings" className="text-ink-500 hover:text-rouge-600 rounded-full p-2 hover:bg-paper-100" aria-label="设置">
               <SettingsIcon size={16} />
             </Link>
           </div>
@@ -134,15 +129,21 @@ export function Layout() {
         <Outlet />
       </main>
 
-      <footer className="border-t border-ink-200 py-6 mt-12">
-        <div className="max-w-6xl mx-auto px-8 lg:px-12 flex items-center justify-between text-tiny text-ink-500">
+      <footer className="border-t border-paper-200 py-7 mt-12 bg-paper-50/60">
+        <div className="max-w-6xl mx-auto px-8 lg:px-12 flex flex-wrap gap-3 items-center justify-between text-tiny text-ink-500">
           <span className="inline-flex items-center gap-2">
             <Logo size={16} />
-            欧哈娜 · Ohana · 黑客松原型
+            欧哈娜 · 把牵挂轻轻放在一起
           </span>
-          <Link to="/settings" className="hover:text-ink-900">
-            重置数据 / 切换身份 / 设置
-          </Link>
+          <span className="flex items-center gap-4">
+            <Link to="/pitch" className="hover:text-rouge-600 inline-flex items-center gap-1">
+              <Sparkles size={11} />
+              介绍
+            </Link>
+            <Link to="/settings" className="hover:text-rouge-600">
+              设置
+            </Link>
+          </span>
         </div>
       </footer>
     </div>

@@ -41,7 +41,7 @@ const PHASE_LABEL_SIMPLE: Record<SubTask['phase'], string> = {
 
 const REJECT_REASONS = [
   '今天不在城市里',
-  '工作脱不开身',
+  '最近确实没有余力',
   '身体不舒服',
   '已经做过 / 没必要',
   '别人更合适',
@@ -139,22 +139,22 @@ export function TaskDetailModal({ task, onClose }: Props) {
 
   async function handleCopyShare() {
     if (!acceptedOwner) {
-      pushToast('请先选一个执行人', 'warn')
+      pushToast('先选一位方便问问的家人', 'warn')
       return
     }
     const owner = members.find((m) => m.id === acceptedOwner)
     const proof = task!.requiredProof?.length
       ? `\n完成证明：${task!.requiredProof.join(' / ')}`
       : ''
-    const text = `【承接卡片】
-任务：${task!.title}
-执行：${owner?.name ?? acceptedOwner}
-截止：${editedDeadline || '本周内'}${proof}
+    const text = `【一起照看】
+家中牵挂：${task!.title}
+可以请：${owner?.name ?? acceptedOwner}
+希望时间：${editedDeadline || '本周内'}${proof}
 
-请回复"我来"或在 App 点接受。`
+方便的话请回复"我来"，不方便也请告诉家人。`
     try {
       await navigator.clipboard.writeText(text)
-      pushToast('承接卡片已复制', 'success')
+      pushToast('温柔提醒已复制', 'success')
     } catch {
       pushToast('复制失败 · 请手动选择', 'warn')
     }
@@ -170,12 +170,12 @@ export function TaskDetailModal({ task, onClose }: Props) {
     const names = Object.keys(result)
       .map((id) => members.find((m) => m.id === id)?.name ?? id)
       .join(' / ')
-    pushToast(`已按 AI 推荐填好（${names}）· 可手动调整后确认指派`, 'success')
+    pushToast(`先帮你选了可能方便的家人（${names}）· 发送前仍可调整`, 'success')
   }
 
   function handleConfirmAndNotify() {
     if (assignedCount === 0) {
-      pushToast('还没有任何子任务分配出去', 'warn')
+      pushToast('还没有邀请家人一起照看', 'warn')
       return
     }
     setShowAssignAll(true)
@@ -238,21 +238,21 @@ export function TaskDetailModal({ task, onClose }: Props) {
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-ink-900/30 backdrop-blur-sm flex items-stretch md:items-center md:justify-center p-0 md:p-6 animate-fade-in"
+        className="fixed inset-0 z-40 bg-ink-900/45 backdrop-blur-sm flex items-stretch md:items-center md:justify-center p-0 md:p-6 animate-fade-in"
         onClick={onClose}
       >
         <div
-          className="w-full md:max-w-3xl bg-paper shadow-modal max-h-[92vh] overflow-y-auto"
+          className="w-full md:max-w-3xl bg-paper-50 border border-paper-200 rounded-none md:rounded-3xl shadow-modal max-h-[92vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="sticky top-0 bg-paper border-b border-ink-200 px-8 py-5 flex items-start justify-between gap-4 z-10">
+          <div className="sticky top-0 bg-paper-50 border-b border-paper-200 px-8 py-5 flex items-start justify-between gap-4 z-10">
             <div className="min-w-0">
-              <div className="eyebrow">{isSimple ? '要做的事' : '任务详情'}</div>
+              <div className="eyebrow">{isSimple ? '家里在惦记' : '一起照看的事'}</div>
               <h2 className="font-serif text-h2 text-ink-900 mt-2 leading-tight">{task.title}</h2>
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 {(task.dueDate || task.dueDateText) && (
                   <div className={cn('text-small', statusV.textCls)}>
-                    截止 · {formatDueDate(task.dueDate) ?? task.dueDateText}
+                    想在 {formatDueDate(task.dueDate) ?? task.dueDateText} 安心下来
                   </div>
                 )}
                 <span className={cn('text-tiny font-medium', statusV.textCls)}>
@@ -262,7 +262,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
               {/* 来源 / 发起人 / 地点 */}
               <div className="mt-3 flex flex-wrap items-center gap-3 text-tiny">
                 <span className="flex items-center gap-1.5 text-ink-500">
-                  <span className="text-ink-400">{isSimple ? '谁先提到' : '发起'}</span>
+                  <span className="text-ink-400">最先惦记</span>
                   <OriginatorLabel
                     id={task.originatorId}
                     label={task.originatorLabel}
@@ -292,17 +292,17 @@ export function TaskDetailModal({ task, onClose }: Props) {
             {/* "为我"提示 —— 当前身份被指派了这条任务 */}
             {isOwnerOfThis && task.status !== 'completed' && (
               hasAccepted ? (
-                <section className="border-l-2 border-moss-500 bg-moss-50 px-5 py-4">
+                <section className="rounded-2xl border border-moss-100 bg-moss-50 px-5 py-4">
                   <div className="eyebrow text-moss-500 mb-1 inline-flex items-center gap-1.5">
                     <Check size={11} />
-                    你已承接你的部分
+                    谢谢你，已经答应照看这一部分
                   </div>
                   {isMultiPerson && (
                     <div className="text-small text-ink-700 mb-2">
                       {acceptedCount} / {totalAssignees} 人确认 ·{' '}
                       {acceptedCount < totalAssignees
                         ? `还在等其他家人确认`
-                        : '全员已承接 · 这条事真正落下了'}
+                        : '大家都有回应 · 这件事有人陪着了'}
                     </div>
                   )}
                   {subtasksForMe.length > 0 && (
@@ -322,8 +322,8 @@ export function TaskDetailModal({ task, onClose }: Props) {
                   )}
                 </section>
               ) : (
-                <section className="border-l-2 border-rouge-500 bg-rouge-50 px-5 py-4">
-                  <div className="eyebrow text-rouge-500 mb-1">这条任务指给你了</div>
+                <section className="rounded-2xl border border-rouge-100 bg-rouge-50 px-5 py-4">
+                  <div className="eyebrow mb-1">家人想问你是否方便帮忙</div>
                   {isMultiPerson && (
                     <div className="text-tiny text-ink-500 mb-2">
                       这件事需要 {totalAssignees} 个人各做一部分 ·{' '}
@@ -346,14 +346,14 @@ export function TaskDetailModal({ task, onClose }: Props) {
                     <div className="flex flex-wrap gap-2">
                       <button className="btn-rouge" onClick={() => handleRespond('accepted')}>
                         <Check size={12} />
-                        我接手
+                        我可以陪着
                       </button>
                       <button
                         className="btn-outline"
                         onClick={() => setShowRejectPicker(true)}
                       >
                         <X size={12} />
-                        我做不了
+                        我最近不方便
                       </button>
                       <button className="btn-ghost" onClick={() => handleRespond('snoozed')}>
                         <Clock size={12} />
@@ -362,14 +362,14 @@ export function TaskDetailModal({ task, onClose }: Props) {
                     </div>
                   ) : (
                     <div>
-                      <div className="text-tiny text-ink-500 mb-2">告诉发起人原因（可选）：</div>
+                      <div className="text-tiny text-ink-500 mb-2">和家人说一声原因（可选）：</div>
                       <div className="flex flex-wrap gap-1.5 mb-3">
                         {REJECT_REASONS.map((r) => (
                           <button
                             key={r}
                             onClick={() => setRejectReason(r)}
                             className={cn(
-                              'px-2.5 py-1 text-tiny border transition',
+                              'px-2.5 py-1 rounded-full text-tiny border transition',
                               rejectReason === r
                                 ? 'border-rouge-500 bg-rouge-100 text-rouge-700'
                                 : 'border-ink-300 text-ink-700 hover:border-ink-700',
@@ -389,7 +389,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                       <div className="flex flex-wrap gap-2">
                         <button className="btn-rouge" onClick={() => handleRespond('rejected')}>
                           <Send size={12} />
-                          告诉发起人
+                          告诉家人
                         </button>
                         <button
                           className="btn-ghost"
@@ -409,10 +409,10 @@ export function TaskDetailModal({ task, onClose }: Props) {
 
             {/* 多人任务总进度（不是 owner 的人也能看到） */}
             {isMultiPerson && task.status !== 'completed' && !isOwnerOfThis && (
-              <section className="border border-ink-200 bg-paper-50 px-5 py-3">
+              <section className="rounded-2xl border border-paper-200 bg-paper-50 px-5 py-3">
                 <div className="text-small text-ink-700 flex items-center gap-3 flex-wrap">
                   <span className="eyebrow text-ink-500">家里这条事</span>
-                  <span>{acceptedCount} / {totalAssignees} 人已确认承接</span>
+                  <span>{acceptedCount} / {totalAssignees} 人已经回应</span>
                   {acceptedCount > 0 && acceptedCount < totalAssignees && (
                     <span className="text-tiny text-ink-400">还在等其他家人</span>
                   )}
@@ -455,13 +455,13 @@ export function TaskDetailModal({ task, onClose }: Props) {
             {/* AI 解读 */}
             {task.aiExplanation && (
               <section className="border-l-2 border-rouge-500 pl-5">
-                <div className="eyebrow mb-2 text-rouge-500">
-                  {isSimple ? '系统帮你整理' : 'AI 解读'}
+                  <div className="eyebrow mb-2">
+                  {isSimple ? '帮你整理' : '欧哈娜的理解'}
                 </div>
                 <p className="text-body text-ink-800 leading-relaxed">{task.aiExplanation}</p>
                 {task.suggestionReason && (
                   <div className="mt-4 text-small text-ink-600 flex items-start gap-2 flex-wrap">
-                    <span className="text-ink-400">{isSimple ? '谁来做' : '推荐'}</span>
+                    <span className="text-ink-400">可以问问</span>
                     <MemberPill id={task.suggestedOwnerId} />
                     <span className="text-ink-500">· {task.suggestionReason}</span>
                   </div>
@@ -473,17 +473,17 @@ export function TaskDetailModal({ task, onClose }: Props) {
             <section>
               <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
                 <div>
-                  <div className="eyebrow">{isSimple ? '要做的事' : '行动清单'}</div>
+                  <div className="eyebrow">{isSimple ? '可以怎么照应' : '照应步骤'}</div>
                   <div className="text-tiny text-ink-500 mt-1">
                     {task.subtasks.filter((s) => s.completed).length} / {task.subtasks.length} 已完成
-                    {!isSimple && ' · 点头像换执行人'}
+                    {!isSimple && ' · 点头像换一位方便的人'}
                   </div>
                 </div>
                 {isOriginator && task.status !== 'completed' && (
                   <div className="flex flex-wrap gap-2">
                     <button className="btn-outline text-tiny" onClick={handleAssignAll}>
                       <Wand2 size={12} />
-                      全部按 AI 推荐指派
+                      帮我找方便的人
                     </button>
                     <button
                       className="btn-rouge text-tiny"
@@ -491,7 +491,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                       disabled={assignedCount === 0}
                     >
                       <MessageSquareShare size={12} />
-                      确认指派并生成通知
+                      写好问候消息
                     </button>
                   </div>
                 )}
@@ -552,7 +552,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
             {/* 完成证明 · 支持拍照上传 */}
             {(task.requiredProof && task.requiredProof.length > 0) || (task.attachments?.length ?? 0) > 0 ? (
               <section>
-                <div className="eyebrow mb-3">{isSimple ? '拍张照片' : '完成证明'}</div>
+                <div className="eyebrow mb-3">{isSimple ? '拍张照片' : '留下安心的回音'}</div>
                 {task.requiredProof && task.requiredProof.length > 0 && (
                   <div className="text-body text-ink-700 mb-3">
                     {task.requiredProof.join(' · ')}
@@ -590,7 +590,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <Camera size={12} />
-                  {isSimple ? '拍照上传' : '上传照片作为完成证明'}
+                  {isSimple ? '拍照上传' : '分享一张让家人安心的照片'}
                 </button>
               </section>
             ) : null}
@@ -647,9 +647,9 @@ export function TaskDetailModal({ task, onClose }: Props) {
             {/* 整体指派给一个人（旧流程） · 仅对没有多人子任务的简单任务显示 */}
             {isOriginator && task.status !== 'completed' && !isMultiPerson && (
               <section className="border-t border-ink-200 pt-8">
-                <div className="eyebrow mb-3">或：整体指派给一个人</div>
+                <div className="eyebrow mb-3">或者：请一个人全程陪着</div>
                 <p className="text-small text-ink-600 mb-5 max-w-xl">
-                  这条任务比较简单，可以整段交给一个人。多人任务请用上面的「全部按 AI 推荐指派」。
+                  如果这件小事不复杂，可以先问一位家人是否方便陪着完成。
                 </p>
 
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -657,7 +657,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                     <button
                       key={m.id}
                       className={cn(
-                        'inline-flex items-center gap-2 px-3 py-2 border text-small transition',
+                        'inline-flex items-center gap-2 rounded-full px-3 py-2 border text-small transition',
                         acceptedOwner === m.id
                           ? 'border-rouge-500 bg-rouge-50 text-rouge-700'
                           : 'border-ink-300 text-ink-700 hover:border-ink-700',
@@ -674,7 +674,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                 </div>
 
                 <label className="block mb-5">
-                  <span className="text-tiny text-ink-500">截止时间</span>
+                  <span className="text-tiny text-ink-500">希望什么时候前有回音</span>
                   <input
                     type="text"
                     value={editedDeadline}
@@ -687,7 +687,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                 <div className="flex flex-wrap gap-2">
                   <button className="btn-rouge" onClick={handleAccept} disabled={!acceptedOwner}>
                     <Send size={12} />
-                    指派并标记已发出
+                    请 ta 一起照看
                   </button>
                   <button
                     className="btn-outline"
@@ -695,7 +695,7 @@ export function TaskDetailModal({ task, onClose }: Props) {
                     disabled={!acceptedOwner}
                   >
                     <Copy size={12} />
-                    只复制承接卡片
+                    复制问候消息
                   </button>
                 </div>
               </section>
@@ -713,13 +713,13 @@ export function TaskDetailModal({ task, onClose }: Props) {
                     }}
                   >
                     <Check size={12} />
-                    标记整个任务完成
+                    这件事已经安心了
                   </button>
                 </div>
                 <button
                   className="text-tiny text-ink-400 hover:text-rouge-500 inline-flex items-center gap-1"
                   onClick={() => {
-                    if (confirm('删除这条任务？')) {
+                    if (confirm('不再保留这件牵挂吗？')) {
                       removeTask(task.id)
                       onClose()
                     }

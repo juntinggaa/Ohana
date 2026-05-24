@@ -5,9 +5,9 @@ import { cn } from '@/lib/utils'
  *
  * Logo · 两只手环抱一个家
  *   - 深色双弧 = 围拢的两只手（一上一下 · 互锁）
- *   - 中央赭红小房子 = 家
+ *   - 中央桃粉小房子 = 家
  *
- * 用 CSS 变量保持跟随父级颜色 · 但内部红色 House 强制 rouge-500 · 不变
+ * 用 CSS 变量保持跟随父级颜色 · 内部小屋保持温暖强调色
  *
  * 若想用像素图，把同名 PNG 放到 public/logo.png，然后改 <img src="/logo.png" />
  */
@@ -54,13 +54,13 @@ export function Logo({
       <line x1="16" y1="42" x2="13" y2="35" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
       <line x1="11" y1="44" x2="8" y2="37" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
 
-      {/* 中央 · 赭红小房子 */}
+      {/* 中央 · 温暖小房子 */}
       {/* 屋顶 */}
-      <path d="M 32 21 L 21 34 L 43 34 Z" fill="#B5462D" />
+      <path d="M 32 21 L 21 34 L 43 34 Z" fill="#DC746B" />
       {/* 房身 */}
-      <rect x="23" y="33" width="18" height="14" fill="#B5462D" />
+      <rect x="23" y="33" width="18" height="14" fill="#DC746B" />
       {/* 门洞 · 用底色 paper 露出 */}
-      <path d="M 29 47 L 29 41 A 3 3 0 0 1 35 41 L 35 47 Z" fill="#F7F3EB" />
+      <path d="M 29 47 L 29 41 A 3 3 0 0 1 35 41 L 35 47 Z" fill="#FFF9F2" />
     </svg>
   )
 
@@ -73,7 +73,7 @@ export function Logo({
       <span className="inline-flex">{svg}</span>
       <span className="inline-flex items-baseline gap-2">
         <span className="font-serif text-h3 leading-none">欧哈娜</span>
-        <span className="text-eyebrow uppercase tracking-widest text-ink-400 hidden lg:inline">
+        <span className="text-eyebrow tracking-wide text-rouge-500 hidden lg:inline">
           Ohana
         </span>
       </span>

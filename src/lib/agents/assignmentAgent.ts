@@ -20,53 +20,75 @@ interface CategoryHint {
   reason: (member: FamilyMember, traits: string[]) => string
 }
 
+const WARM_TRAIT_LABEL: Record<string, string> = {
+  '同城父母': '和父母同城',
+  '同城老人': '和长辈同城',
+  '可跑腿': '方便帮忙跑一趟',
+  '会陪诊': '愿意陪诊',
+  '能买药': '方便买药',
+  '会拍照': '会分享照片',
+  '了解老人状况': '熟悉长辈近况',
+  '同城孩子': '和孩子同城',
+  '能拍照上传': '会分享照片',
+  '家务行政': '会打理家中安排',
+  '日历可靠': '会记住重要日子',
+  '可对接师傅': '方便接待师傅',
+  '同城家中': '方便到家里',
+  '票据整理': '会整理票据',
+  '统筹': '善于统筹',
+}
+
+function describeTraits(hits: string[]): string {
+  return hits.slice(0, 2).map((t) => WARM_TRAIT_LABEL[t] ?? t).join('、')
+}
+
 const CATEGORY_HINTS: Record<TaskCategory, CategoryHint> = {
   elderly_care: {
-    preferredTraits: ['同城父母', '同城老人', '可跑腿', '会陪诊', '能买药', '了解老人状况', '会拍照'],
-    avoid: ['已超载', '只能做简单事'],
+    preferredTraits: ['和父母同城', '和长辈同城', '同城父母', '同城老人', '方便帮忙跑一趟', '可跑腿', '愿意陪诊', '会陪诊', '方便买药', '能买药', '熟悉家里近况', '了解老人状况', '会分享照片', '会拍照'],
+    avoid: ['最近需要休息', '已超载', '适合轻松的小事', '只能做简单事'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}，处理老人药品 / 跑腿成本最低。`
-        : `推荐 ${m.name}：综合考虑了关系、距离和当前空闲程度。`,
+        ? `${m.name} ${describeTraits(hits)}，也许方便陪着把这件事办好。`
+        : `${m.name} 可能比较方便回应这份牵挂，可以先问问 ta。`,
   },
   medical: {
-    preferredTraits: ['同城父母', '同城老人', '会陪诊', '可跑腿', '会拍照', '了解老人状况'],
-    avoid: ['已超载', '只能做简单事'],
+    preferredTraits: ['和父母同城', '和长辈同城', '同城父母', '同城老人', '愿意陪诊', '会陪诊', '方便帮忙跑一趟', '可跑腿', '会分享照片', '会拍照', '熟悉家里近况', '了解老人状况'],
+    avoid: ['最近需要休息', '已超载', '适合轻松的小事', '只能做简单事'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}，适合现场陪诊和拍处方。`
-        : `推荐 ${m.name}：更可能方便现场跟进，并且当前空闲程度更高。`,
+        ? `${m.name} ${describeTraits(hits)}，或许适合陪着去看看。`
+        : `${m.name} 或许方便陪伴这次就诊，可以先问问 ta。`,
   },
   child_school: {
-    preferredTraits: ['同城孩子', '同城学校', '能拍照上传', '家务行政', '日历可靠'],
-    avoid: ['已超载', '只能做简单事'],
+    preferredTraits: ['和孩子同城', '同城孩子', '同城学校', '会分享照片', '能拍照上传', '会打理家中安排', '家务行政', '会记住重要日子', '日历可靠'],
+    avoid: ['最近需要休息', '已超载', '适合轻松的小事', '只能做简单事'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}，可以直接到班级门口拍照。`
-        : `推荐 ${m.name}：更可能和孩子/学校同城，日历也相对可控。`,
+        ? `${m.name} ${describeTraits(hits)}，可能方便陪孩子完成。`
+        : `${m.name} 可能方便陪孩子完成这件小事。`,
   },
   household_admin: {
-    preferredTraits: ['家务行政', '日历可靠', '可对接师傅', '同城家中', '能拍照上传'],
-    avoid: ['已超载'],
+    preferredTraits: ['会打理家中安排', '家务行政', '会记住重要日子', '日历可靠', '方便接待师傅', '可对接师傅', '方便到家里', '同城家中', '会分享照片', '能拍照上传'],
+    avoid: ['最近需要休息', '已超载'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}，物业 / 师傅这类事务他/她最稳。`
-        : `推荐 ${m.name}：家中行政事务由他/她处理最稳，也避免又回到同一个人。`,
+        ? `${m.name} ${describeTraits(hits)}，可能方便在家接应。`
+        : `${m.name} 也许方便照看这件家中小事，可以先问问 ta。`,
   },
   reimbursement: {
-    preferredTraits: ['票据整理', '统筹'],
-    avoid: ['只能做简单事'],
+    preferredTraits: ['会整理票据', '票据整理', '善于统筹', '统筹'],
+    avoid: ['适合轻松的小事', '只能做简单事'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}，集中在一个晚上处理最高效。`
-        : `推荐 ${m.name}：报销整理需要一个时间整块处理的人。`,
+        ? `${m.name} ${describeTraits(hits)}，可能方便整理留存。`
+        : `${m.name} 或许方便整理这些记录，可以先问问 ta。`,
   },
   general_family: {
-    preferredTraits: ['能拍照上传', '日历可靠', '可跑腿', '同城家中'],
+    preferredTraits: ['会分享照片', '能拍照上传', '会记住重要日子', '日历可靠', '方便帮忙跑一趟', '可跑腿', '方便到家里', '同城家中'],
     reason: (m, hits) =>
       hits.length > 0
-        ? `推荐 ${m.name}：${hits.slice(0, 2).join(' / ')}。`
-        : `推荐 ${m.name}：当前空闲程度较高。`,
+        ? `${m.name} ${describeTraits(hits)}，或许方便帮一把。`
+        : `${m.name} 可能有余裕回应这件小事，可以先问问 ta。`,
   },
 }
 
