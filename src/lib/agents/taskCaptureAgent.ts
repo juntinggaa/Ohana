@@ -56,7 +56,17 @@ const PATTERNS: Pattern[] = [
     requiredProof: ['药品照片', '小票或订单截图'],
   },
   {
-    match: [/复诊/, /门诊/, /挂号/, /高血压/, /心电/, /检查/],
+    match: [
+      /复诊/,
+      /门诊/,
+      /挂号/,
+      /医院/,
+      /高血压/,
+      /心电/,
+      /检查/,
+      /\b(?:hospital|clinic|doctor|appointment)\b/i,
+      /\bbring\s+(?:papa|dad|father|mummy|mom|mother)\b/i,
+    ],
     category: 'medical',
     urgency: 'high',
     buildTitle: () => '陪家人安心复诊',
@@ -85,9 +95,20 @@ const PATTERNS: Pattern[] = [
 ]
 
 function detectUrgency(text: string, base: Urgency): Urgency {
-  if (/今天|马上|快|紧急|立刻/.test(text)) return 'high'
-  if (/本周|明天|后天/.test(text)) return base === 'low' ? 'medium' : base
+  if (/今天|马上|快|紧急|立刻|\btoday\b|\burgent\b/i.test(text)) return 'high'
+  if (/本周|明天|后天|\btomorrow\b|\bthis week\b/i.test(text)) return base === 'low' ? 'medium' : base
   return base
+}
+
+function dueHintFromText(text: string): string | undefined {
+  const chineseDate = text.match(
+    /(?:\d{1,2}月\d{1,2}日|今天|明天|后天|周[一二三四五六日天]|星期[一二三四五六日天])(?:\s*[上中下晚]午)?\s*\d{1,2}(?::\d{2})?/,
+  )
+  if (chineseDate) return chineseDate[0]
+  const englishDate = text.match(
+    /\b\d{1,2}\s*(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+\d{2,4})?(?:\s+(?:at\s+)?\d{1,2}(?::?\d{2})?\s*(?:am|pm)?)?/i,
+  )
+  return englishDate?.[0]
 }
 
 function findMemberBySpeakerLabel(
@@ -217,6 +238,7 @@ export function captureTasksFromMessages(
         suggestionReason: recommendation?.reason,
         requiredProof: p.requiredProof,
         aiExplanation: `从消息里注意到：${matched.map((r) => r.source).join('、')}。这件事也许值得家人一起留意。`,
+        dueDateText: dueHintFromText(body),
         matchedLine: line,
         matchedKeywords: matched.map((r) => r.source),
         confidence: Math.min(0.55 + matched.length * 0.15, 0.95),

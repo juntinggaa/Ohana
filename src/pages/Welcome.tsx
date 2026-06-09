@@ -67,18 +67,9 @@ export function WelcomePage() {
       name: '',
       relation: '我自己',
       city: '',
-      capacity: 'busy',
+      capacity: '',
       notes: '',
       isMe: true,
-    },
-    {
-      id: newDraftId(),
-      name: '',
-      relation: '妈妈',
-      city: '',
-      capacity: 'flexible',
-      notes: '',
-      isMe: false,
     },
   ])
 
@@ -94,7 +85,7 @@ export function WelcomePage() {
         name: '',
         relation: '伴侣',
         city: '',
-        capacity: 'medium',
+        capacity: '',
         notes: '',
         isMe: false,
       },
@@ -127,15 +118,15 @@ export function WelcomePage() {
     setFamily(members)
     setCurrentUser(me.isMe ? 'me' : members[0].id)
     dismissWelcome()
-    pushToast(`欢迎回家，${me.name} · 先留下一句近况吧`, 'success')
+    pushToast(`欢迎回家，${me.name} · 先和家人说句话吧`, 'success')
     navigate('/memory')
   }
 
   function useSampleFamily() {
     resetToSampleData()
     dismissWelcome()
-    pushToast('已打开唐宁家的示例 · 看看如何把牵挂接住', 'info')
-    navigate('/memory?mode=paste')
+    pushToast('已打开唐宁家的示例 · 可以直接聊聊或问记忆本', 'info')
+    navigate('/memory')
   }
 
   return (
@@ -149,11 +140,11 @@ export function WelcomePage() {
             把牵挂的人，<br className="hidden sm:block" />轻轻放在一起。
           </h1>
           <p className="mt-5 text-lead text-ink-600 max-w-xl leading-relaxed">
-            欧哈娜帮家人记住近况、问候与需要搭把手的小事。
-            先告诉我们家里有谁，之后一句话就能把关心留下来。
+            先写下你的称呼，就能开始聊天。
+            家人的资料和想记住的小事，以后再慢慢补。
           </p>
           <p className="mt-4 inline-flex rounded-full bg-paper-50 border border-paper-200 px-4 py-2 text-tiny text-ink-500 shadow-soft">
-            你的家庭资料只留在当前浏览器里
+            当前版本仅保存在这台设备的浏览器里
           </p>
         </header>
 
@@ -202,63 +193,70 @@ export function WelcomePage() {
                     ))}
                   </select>
                 </Field>
-                <Field label="现在生活在哪里 (选填)">
-                  <input
-                    type="text"
-                    value={d.city}
-                    onChange={(e) => update(d.id, { city: e.target.value })}
-                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
-                    placeholder="同你 / 上海 / 南京 ..."
-                  />
-                </Field>
-                <Field label="最近的生活节奏 (选填)">
-                  <select
-                    value={d.capacity}
-                    onChange={(e) => update(d.id, { capacity: e.target.value as CapacityTag })}
-                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
-                  >
-                    <option value="">未指定</option>
-                    <option value="busy">最近比较忙，也需要被照顾</option>
-                    <option value="medium">平常节奏</option>
-                    <option value="flexible">最近比较有余裕</option>
-                  </select>
-                </Field>
-                <Field label="想让家人记得的事 (选填)" className="md:col-span-2">
-                  <input
-                    type="text"
-                    value={d.notes}
-                    onChange={(e) => update(d.id, { notes: e.target.value })}
-                    className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
-                    placeholder="例如：最近在复诊 · 不太爱发消息 · 喜欢周末电话"
-                  />
-                </Field>
               </div>
+              <details className="mt-4 rounded-2xl bg-honey-50/70 border border-honey-100 px-4 py-3">
+                <summary className="cursor-pointer text-small text-ink-600">
+                  之后再补充：位置、生活节奏与想记住的事
+                </summary>
+                <div className="grid md:grid-cols-2 gap-3 mt-4">
+                  <Field label="现在生活在哪里 (选填)">
+                    <input
+                      type="text"
+                      value={d.city}
+                      onChange={(e) => update(d.id, { city: e.target.value })}
+                      className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
+                      placeholder="同你 / 上海 / 南京 ..."
+                    />
+                  </Field>
+                  <Field label="最近的生活节奏 (选填)">
+                    <select
+                      value={d.capacity}
+                      onChange={(e) => update(d.id, { capacity: e.target.value as CapacityTag | '' })}
+                      className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
+                    >
+                      <option value="">未指定</option>
+                      <option value="busy">最近比较忙，也需要被照顾</option>
+                      <option value="medium">平常节奏</option>
+                      <option value="flexible">最近比较有余裕</option>
+                    </select>
+                  </Field>
+                  <Field label="想让家人记得的事 (选填)" className="md:col-span-2">
+                    <input
+                      type="text"
+                      value={d.notes}
+                      onChange={(e) => update(d.id, { notes: e.target.value })}
+                      className="w-full bg-paper border border-paper-200 px-3 py-2 text-body focus:border-rouge-300 outline-none"
+                      placeholder="例如：最近在复诊 · 喜欢周末电话"
+                    />
+                  </Field>
+                </div>
+              </details>
             </div>
           ))}
         </div>
 
         <button onClick={add} className="btn-outline mb-12 w-full md:w-auto">
           <Plus size={14} />
-          再加一个家人
+          加一位家人（可稍后）
         </button>
 
         <div className="border-t border-paper-200 pt-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <button onClick={useSampleFamily} className="btn-ghost">
             <Sparkles size={12} />
-            先看看一个家庭示例
+            看看示例家庭
           </button>
           <button onClick={finish} className={cn('btn-rouge')}>
-            一起回家看看
+            开始家庭聊天
             <ArrowRight size={14} />
           </button>
         </div>
 
-        <div className="mt-12 text-small text-ink-500 leading-relaxed rounded-2xl bg-honey-50 border border-honey-100 p-5">
-          <strong className="text-ink-700">为什么问城市和节奏？</strong>
-          <span className="block mt-1">
-            当家里真的需要陪诊、取药或接孩子时，欧哈娜才能温柔地建议谁比较方便搭把手，不让关心总落在一个人身上。
+        <details className="mt-10 text-small text-ink-500 leading-relaxed rounded-2xl bg-honey-50 border border-honey-100 p-5">
+          <summary className="cursor-pointer text-ink-700">以后为什么可能会问生活节奏？</summary>
+          <span className="block mt-2">
+            只有当家里真的需要陪诊、取药或接孩子时，这些资料才帮助你判断谁比较方便。现在可以先跳过。
           </span>
-        </div>
+        </details>
       </div>
     </div>
   )

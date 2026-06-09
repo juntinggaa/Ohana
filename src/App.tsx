@@ -39,7 +39,7 @@ export default function App() {
       <WelcomeGate />
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/me" replace />} />
+          <Route path="/" element={<Navigate to="/memory" replace />} />
           <Route path="/welcome" element={<WelcomePage />} />
           {/* 三个主视图 · 所有家人通用 */}
           <Route path="/me" element={<TodayPage />} />
@@ -48,8 +48,8 @@ export default function App() {
           {/* 旧路径兼容 */}
           <Route path="/today" element={<Navigate to="/me" replace />} />
           <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-          {/* 收件箱已并入家庭记忆 · 粘聊天 tab */}
-          <Route path="/inbox" element={<Navigate to="/memory?mode=paste" replace />} />
+          {/* 旧收件箱入口并入问欧哈娜，安排会在对话中自动整理。 */}
+          <Route path="/inbox" element={<Navigate to="/memory?view=assistant" replace />} />
           {/* 全部任务已并入 /me · 全部事项 tab */}
           <Route path="/tasks" element={<Navigate to="/me?view=all" replace />} />
           {/* 次要 / 协调者高级 */}
@@ -57,7 +57,7 @@ export default function App() {
           <Route path="/family" element={<FamilyPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/pitch" element={<PitchModePage />} />
-          <Route path="*" element={<Navigate to="/me" replace />} />
+          <Route path="*" element={<Navigate to="/memory" replace />} />
         </Route>
       </Routes>
       <Toaster />

@@ -2,13 +2,13 @@ import { useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Send, Mic, Image as ImageIcon, Sparkles, Brain, X, Check,
-  MessageCircle, ClipboardPaste, ArrowRight, CheckCircle2,
+  MessageCircle, Bot, BookOpen, ArrowRight, CheckCircle2,
 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { Avatar } from '@/components/Avatar'
 import { MemberPill } from '@/components/MemberPill'
 import { FamilyChatInput } from '@/components/FamilyChatInput'
-import { FamilyRoom } from '@/components/FamilyRoom'
+import { FamilyRoom, type FamilyRoomView } from '@/components/FamilyRoom'
 import { buildMentalLoadPatch, useAppStore } from '@/lib/store'
 import { useIsElder } from '@/lib/useUiMode'
 import { processFamilyMemoryMessage } from '@/lib/agents/familyMemoryAgent'
@@ -18,13 +18,11 @@ import type { CapturedTask } from '@/lib/agents/taskCaptureAgent'
 import { newId } from '@/lib/utilsId'
 import { cn } from '@/lib/utils'
 
-type Mode = 'chat' | 'paste'
-
 const QUICK_PROMPTS = [
   '今天大家都好吗？',
   '我今天有件开心的小事想分享',
   '今晚想给大家打个电话。',
-  '请记住：医药卡放在玄关柜第二层的蓝色文件袋里。',
+  '医药卡在玄关柜第二层的蓝色文件袋里。',
 ]
 
 const ASSISTANT_PROMPTS = ['医药卡在哪里？', '爸爸复诊要带什么？', '家里记过药盒放在哪里吗？']
@@ -48,74 +46,71 @@ const CATEGORY_LABEL: Record<string, string> = {
 }
 
 export function MemoryPage() {
-  const isElder = useIsElder()
   const [params, setParams] = useSearchParams()
-  const initialMode: Mode = params.get('mode') === 'paste' ? 'paste' : 'chat'
-  // 老人版强制走 chat 模式（粘聊天对他们没意义）
-  const [mode, setMode] = useState<Mode>(isElder ? 'chat' : initialMode)
+  const requestedView = params.get('view')
+  const view: FamilyRoomView =
+    params.get('ask') || params.get('mode') === 'paste'
+      ? 'assistant'
+      : requestedView === 'assistant' || requestedView === 'memories'
+        ? requestedView
+        : 'family'
 
-  function switchMode(next: Mode) {
-    setMode(next)
-    if (next === 'chat') params.delete('mode')
-    else params.set('mode', 'paste')
-    setParams(params, { replace: true })
+  function switchView(next: FamilyRoomView) {
+    const nextParams = new URLSearchParams(params)
+    nextParams.set('view', next)
+    nextParams.delete('mode')
+    nextParams.delete('ask')
+    nextParams.delete('say')
+    setParams(nextParams, { replace: true })
   }
 
   return (
     <>
       <PageHeader
-        title={isElder ? '和家人说说话' : '家里的聊天室'}
-        description={
-          isElder
-            ? '想到什么，说一句就好。你的家人会在这里看见。'
-            : '问候和开心事先作为聊天留下来；物品位置与复诊清单可以收进记忆本，需要时再问欧哈娜。'
-        }
+        title="家里聊聊"
+        description="同一套简单入口给每位家人：留言、问欧哈娜，或把重要位置连照片一起记下来。"
+        className="pt-7 md:pt-10 pb-4"
       />
 
-      {/* 老人版隐藏 tab · 只保留 chat */}
-      {!isElder && (
-        <div className="max-w-5xl mx-auto px-8 lg:px-12 pt-2 pb-6">
-          <div className="segmented">
-            <button
-              onClick={() => switchMode('chat')}
-              className={cn(
-                'segment',
-                mode === 'chat'
-                  ? 'segment-active'
-                  : 'text-ink-600 hover:text-ink-900',
-              )}
-            >
-              <MessageCircle size={12} />
-              家庭聊天
-            </button>
-            <button
-              onClick={() => switchMode('paste')}
-              className={cn(
-                'segment',
-                mode === 'paste'
-                  ? 'segment-active'
-                  : 'text-ink-600 hover:text-ink-900',
-              )}
-            >
-              <ClipboardPaste size={12} />
-              带入需要留意的提醒
-            </button>
-          </div>
-          <p className="text-tiny text-ink-500 mt-2 max-w-xl leading-snug">
-            {mode === 'chat'
-              ? '这里是聊天，不会把一句问候自动变成待办。需要家人照应的提醒，再使用另一页整理。'
-              : '把家庭群、医院或学校的提醒带进来，看看有没有值得大家一起留心的事。'}
-          </p>
+      <div className="max-w-6xl mx-auto px-6 lg:px-12 pb-5">
+        <div className="segmented">
+          <button
+            onClick={() => switchView('family')}
+            className={cn('segment', view === 'family' && 'segment-active')}
+          >
+            <MessageCircle size={12} />
+            发给家人
+          </button>
+          <button
+            onClick={() => switchView('assistant')}
+            className={cn('segment', view === 'assistant' && 'segment-active')}
+          >
+            <Bot size={12} />
+            问欧哈娜
+          </button>
+          <button
+            onClick={() => switchView('memories')}
+            className={cn('segment', view === 'memories' && 'segment-active')}
+          >
+            <BookOpen size={12} />
+            家庭记忆
+          </button>
         </div>
-      )}
+        <p className="text-tiny text-ink-500 mt-2 max-w-xl leading-snug">
+          {view === 'family'
+            ? '这是全家都看得到的留言区。'
+            : view === 'assistant'
+              ? '这是一段独立私聊；输入预约或提醒时，欧哈娜会直接整理成事项。'
+              : '每位家人都能保存位置说明与现场照片，之后问欧哈娜就能找回来。'}
+        </p>
+      </div>
 
-      {mode === 'chat' || isElder ? (
-        <FamilyRoom
-          initialText={params.get('ask') ?? params.get('say') ?? ''}
-          initialAudience={params.get('ask') ? 'assistant' : 'family'}
-          isElder={isElder}
-        />
-      ) : <PasteMode />}
+      <FamilyRoom
+        initialText={params.get('ask') ?? params.get('say') ?? ''}
+        initialAudience={view === 'assistant' ? 'assistant' : 'family'}
+        view={view}
+        onViewChange={switchView}
+      />
     </>
   )
 }

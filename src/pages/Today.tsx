@@ -139,8 +139,8 @@ export function TodayPage() {
               <InboxIcon size={14} />
               说一句近况
             </Link>
-            <Link to="/memory?mode=paste" className="btn-outline">
-              带入消息
+            <Link to="/memory?view=assistant" className="btn-outline">
+              说一项安排
             </Link>
           </div>
         </div>

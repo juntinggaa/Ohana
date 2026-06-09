@@ -1,30 +1,21 @@
 import { NavLink, Outlet, useLocation, Link } from 'react-router-dom'
 import { Sparkles, Settings as SettingsIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { hasDeepSeekKey } from '@/lib/llm/llmClient'
+import { getLLMProviderLabel, hasDeepSeekKey } from '@/lib/llm/llmClient'
 import { hasMistralKey } from '@/lib/ocr/mistralOcr'
 import { UserSwitcher } from './UserSwitcher'
 import { NotificationBell } from './NotificationBell'
-import { ModeToggle } from './ModeToggle'
 import { Logo } from './Logo'
-import { useUiMode } from '@/lib/useUiMode'
 
-// 三个主视图 · 所有家人都能看到
+// 同一套家庭入口 · 不因身份隐藏任务或记忆
 const NAV_PRIMARY = [
-  { to: '/me',       label: '为你留意' },
+  { to: '/memory',   label: '聊天与记忆' },
   { to: '/overview', label: '我们的家' },
-  { to: '/memory',   label: '家里聊聊' },
+  { to: '/me',       label: '为你留意' },
 ]
 
 const NAV_SECONDARY = [
   { to: '/family', label: '家人小档案' },
-]
-
-// 老人版 · 三个简单入口
-const NAV_ELDER = [
-  { to: '/me',     label: '今天好吗' },
-  { to: '/memory', label: '聊聊天' },
-  { to: '/family', label: '家人' },
 ]
 
 export function Layout() {
@@ -32,10 +23,9 @@ export function Layout() {
   const isPitch = pathname.startsWith('/pitch')
   const isWelcome = pathname.startsWith('/welcome')
   const liveLLM = hasDeepSeekKey()
+  const llmProvider = getLLMProviderLabel() ?? 'AI'
   const liveOcr = hasMistralKey()
-  const mode = useUiMode()
-  const isElder = mode === 'elder'
-  const NAV = isElder ? NAV_ELDER : [...NAV_PRIMARY, ...NAV_SECONDARY]
+  const NAV = [...NAV_PRIMARY, ...NAV_SECONDARY]
 
   if (isPitch) {
     return (
@@ -54,16 +44,10 @@ export function Layout() {
   }
 
   return (
-    <div
-      className={cn(
-        'min-h-screen flex flex-col',
-        // 老人版 · 整站字号放大约 1 级
-        isElder && 'text-[17px] leading-relaxed',
-      )}
-    >
+    <div className="min-h-screen flex flex-col">
       <header className="border-b border-paper-200 sticky top-0 z-30 backdrop-blur-md bg-paper/85">
         <div className="max-w-6xl mx-auto px-5 lg:px-12 min-h-20 py-3 flex flex-wrap items-center justify-between gap-3">
-          <Link to="/me" className="group shrink-0">
+          <Link to="/memory" className="group shrink-0">
             <Logo withWordmark size={36} />
           </Link>
 
@@ -95,9 +79,9 @@ export function Layout() {
               )}
               title={
                 liveLLM && liveOcr
-                  ? 'OpenRouter (DeepSeek-V3) + OCR.space 都已连接'
+                  ? `${llmProvider} + OCR.space 都已配置`
                   : liveLLM
-                    ? 'OpenRouter 已连接 · OCR 未配置'
+                    ? `${llmProvider} 已配置 · OCR 未配置`
                     : '本地确定性逻辑（未连接 LLM）'
               }
             >
@@ -113,9 +97,6 @@ export function Layout() {
             </span>
 
             <NotificationBell />
-            <span className="hidden md:inline-flex">
-              <ModeToggle />
-            </span>
             <UserSwitcher />
 
             <Link to="/settings" className="text-ink-500 hover:text-rouge-600 rounded-full p-2 hover:bg-paper-100" aria-label="设置">

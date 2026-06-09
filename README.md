@@ -140,12 +140,12 @@ hackhaton/
 
 ## 十、明天接入真实 LLM 时
 
-只改 `src/lib/llm/llmClient.ts` 这一个文件：
+LLM 通道已经可用：
 
-1. 在 `.env` 里填 `VITE_DEEPSEEK_API_KEY=` 或其他
-2. 在 `callRemote()` 函数内补上真正的 fetch 调用
-3. 三个 Agent 的 `async` 入口（`analyzeFamilyMessages` / `generateCareWorkflow` / `analyzeResponsibilityTransfer`）会自动改走远程通道
-4. UI 角标会自动从「本地确定性逻辑」变成「LLM · 远程」
+1. 在 `.env` 里填 `VITE_DEEPSEEK_API_KEY=`，直接调用 DeepSeek 官方 API 的 `deepseek-v4-flash`。
+2. 或填 `VITE_OPENROUTER_API_KEY=`，通过 OpenRouter 调用 DeepSeek；若两个都填写，OpenRouter 优先。
+3. 「问欧哈娜」中需明确开启 AI 补充回答，才会把当前问题与匹配记忆发送给模型。
+4. 没有 key 或调用失败时，应用会继续使用本地确定性逻辑。
 
 ⚠️ **不要把 API Key 直接放进前端构建。** 生产环境请走后端代理。
 

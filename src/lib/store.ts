@@ -13,6 +13,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   AppNotification,
   CareTask,
+  FamilyChatReactionKind,
   FamilyChatMessage,
   FamilyMember,
   FamilyMemoryEntry,
@@ -29,6 +30,7 @@ import { FAMILY_MEMBERS, MENTAL_LOAD_BEFORE, SAMPLE_HOUSEHOLD_MEMORIES } from '.
 import { buildSnapshot } from './mentalLoad'
 import { generateWorkflow } from './agents/careWorkflowAgent'
 import { recommendForCategoryFallback } from './agents/assignmentAgent'
+import { draftCareRequest } from './agents/familyConversationAgent'
 import type { CapturedTask } from './agents/taskCaptureAgent'
 
 export type ToastTone = 'info' | 'success' | 'warn'
@@ -93,7 +95,7 @@ interface AppState {
   removeTrait: (memberId: string, trait: string) => void
 
   // ─── Task actions ────────────────────────────────────
-  ingestCapturedTasks: (captured: CapturedTask[]) => CareTask[]
+  ingestCapturedTasks: (captured: CapturedTask[], sourceMessageId?: string) => CareTask[]
   acceptResponsibility: (taskId: string, ownerId: string, deadline: string) => void
   unacceptResponsibility: (taskId: string) => void
   toggleSubtask: (taskId: string, subtaskId: string) => void
@@ -115,7 +117,10 @@ interface AppState {
   ) => void
   clearFamilyMemoryEntries: () => void
   pushFamilyChatMessage: (message: FamilyChatMessage) => void
+  toggleChatReaction: (messageId: string, memberId: string, kind: FamilyChatReactionKind) => void
+  createCareTaskFromChatMessage: (messageId: string) => string | null
   addHouseholdMemory: (memory: Omit<HouseholdMemory, 'id' | 'createdAt'>) => HouseholdMemory
+  updateHouseholdMemory: (id: string, patch: Partial<HouseholdMemory>) => void
   removeHouseholdMemory: (id: string) => void
 
   // ─── Multi-user actions ──────────────────────────────
@@ -375,17 +380,25 @@ export const useAppStore = create<AppState>()(
         })),
 
       // ───── tasks ─────────────────────────────────────
-      ingestCapturedTasks: (captured) => {
-        const existingTitles = new Set(get().tasks.map((t) => t.title))
+      ingestCapturedTasks: (captured, sourceMessageId) => {
+        const taskKey = (title: string, dueDateText?: string) => `${title}::${dueDateText ?? ''}`
+        const existingByKey = new Map(
+          get().tasks.map((task) => [taskKey(task.title, task.dueDateText), task]),
+        )
+        const linkedExistingIds = new Set<string>()
         const added: CareTask[] = []
         captured.forEach((c) => {
-          if (existingTitles.has(c.title)) return
+          const existing = existingByKey.get(taskKey(c.title, c.dueDateText))
+          if (existing) {
+            if (sourceMessageId) linkedExistingIds.add(existing.id)
+            return
+          }
           const wf = generateWorkflow({ id: c.id, title: c.title, category: c.category })
           const task: CareTask = {
             id: c.id,
             title: c.title,
             category: c.category,
-            sourceMessageIds: [],
+            sourceMessageIds: sourceMessageId ? [sourceMessageId] : [],
             sourceSummary: c.matchedLine || '来自粘贴的家庭消息',
             originatorId: c.originatorId,
             suggestedOwnerId: c.suggestedOwnerId,
@@ -398,17 +411,26 @@ export const useAppStore = create<AppState>()(
             aiExplanation: c.aiExplanation,
           }
           added.push(task)
+          existingByKey.set(taskKey(task.title, task.dueDateText), task)
         })
-        if (added.length > 0) {
+        if (added.length > 0 || linkedExistingIds.size > 0) {
           set((s) => {
-            const tasks = [...added, ...s.tasks]
+            const existingTasks = sourceMessageId
+              ? s.tasks.map((task) =>
+                  linkedExistingIds.has(task.id) && !task.sourceMessageIds.includes(sourceMessageId)
+                    ? { ...task, sourceMessageIds: [...task.sourceMessageIds, sourceMessageId] }
+                    : task,
+                )
+              : s.tasks
+            const tasks = [...added, ...existingTasks]
             return {
               tasks,
               ...buildMentalLoadPatch(s.familyMembers, tasks, s.accepted),
             }
           })
         }
-        return added
+        if (!sourceMessageId) return added
+        return get().tasks.filter((task) => task.sourceMessageIds.includes(sourceMessageId))
       },
 
       acceptResponsibility: (taskId, ownerId, deadline) => {
@@ -642,22 +664,96 @@ export const useAppStore = create<AppState>()(
       pushFamilyChatMessage: (message) =>
         set((s) => ({ familyChatMessages: [...s.familyChatMessages, message] })),
 
+      toggleChatReaction: (messageId, memberId, kind) =>
+        set((s) => ({
+          familyChatMessages: s.familyChatMessages.map((message) => {
+            if (message.id !== messageId) return message
+            const reactions = message.reactions ?? []
+            const hasReaction = reactions.some(
+              (reaction) => reaction.memberId === memberId && reaction.kind === kind,
+            )
+            return {
+              ...message,
+              reactions: hasReaction
+                ? reactions.filter(
+                    (reaction) => !(reaction.memberId === memberId && reaction.kind === kind),
+                  )
+                : [...reactions, { memberId, kind }],
+            }
+          }),
+        })),
+
+      createCareTaskFromChatMessage: (messageId) => {
+        const state = get()
+        const message = state.familyChatMessages.find((item) => item.id === messageId)
+        if (!message || state.tasks.some((task) => task.sourceMessageIds.includes(messageId))) {
+          return null
+        }
+        const draft = draftCareRequest(message.body)
+        if (!draft) return null
+        const id = newId('task')
+        const ownerId = recommendForCategoryFallback(draft.category, state.familyMembers)
+        const workflow = generateWorkflow({ id, title: draft.title, category: draft.category })
+        const task: CareTask = {
+          id,
+          title: draft.title,
+          category: draft.category,
+          sourceMessageIds: [messageId],
+          sourceSummary: message.body,
+          originatorId: message.speakerId ?? state.currentUserId,
+          suggestedOwnerId: ownerId,
+          dueDateText: draft.dueDateText,
+          status: 'needs_owner',
+          urgency: 'medium',
+          subtasks: workflow.subtasks,
+          requiredProof: workflow.requiredProof,
+          aiExplanation: '这条留言明确提到需要家人帮忙，所以只在你确认后放进照应清单。',
+        }
+        set((current) => {
+          const tasks = [task, ...current.tasks]
+          return {
+            tasks,
+            ...buildMentalLoadPatch(current.familyMembers, tasks, current.accepted),
+          }
+        })
+        get().pushToast('已放进「为你留意」，等家人来回应', 'success')
+        return id
+      },
+
       addHouseholdMemory: (memory) => {
         const created: HouseholdMemory = {
           id: newId('knowledge'),
           createdAt: Date.now(),
+          visibility: 'family',
+          confirmedAt: Date.now(),
           ...memory,
         }
         set((s) => {
           const withoutDuplicate = s.householdMemories.filter(
-            (existing) =>
-              existing.title !== created.title &&
-              existing.sourceMessageId !== created.sourceMessageId,
+            (existing) => {
+              const replacesSameNote =
+                existing.title === created.title &&
+                (existing.visibility ?? 'family') === (created.visibility ?? 'family') &&
+                existing.createdById === created.createdById
+              const replacesSourceMessage =
+                Boolean(created.sourceMessageId) &&
+                existing.sourceMessageId === created.sourceMessageId
+              return !replacesSameNote && !replacesSourceMessage
+            },
           )
           return { householdMemories: [created, ...withoutDuplicate] }
         })
         return created
       },
+
+      updateHouseholdMemory: (id, patch) =>
+        set((s) => ({
+          householdMemories: s.householdMemories.map((memory) =>
+            memory.id === id
+              ? { ...memory, ...patch, updatedAt: Date.now() }
+              : memory,
+          ),
+        })),
 
       removeHouseholdMemory: (id) =>
         set((s) => ({
@@ -941,7 +1037,17 @@ export const useAppStore = create<AppState>()(
         if (!Array.isArray(state.notifications)) state.notifications = []
         if (!Array.isArray(state.familyMemoryEntries)) state.familyMemoryEntries = []
         if (!Array.isArray(state.familyChatMessages)) state.familyChatMessages = []
+        state.familyChatMessages = state.familyChatMessages.map((message) => ({
+          ...message,
+          visibility: message.audience === 'assistant' ? 'private' : 'family',
+          reactions: Array.isArray(message.reactions) ? message.reactions : [],
+        }))
         if (!Array.isArray(state.householdMemories)) state.householdMemories = []
+        state.householdMemories = state.householdMemories.map((memory) => ({
+          ...memory,
+          visibility: memory.visibility ?? 'family',
+          confirmedAt: memory.confirmedAt ?? memory.createdAt,
+        }))
         if (!state.uiModeOverride) state.uiModeOverride = 'auto'
         // v8 之前："指派并标记已发出"会把任务误标成 accepted。
         // 真正的承接一定有 accepted response；没有回应记录的 accepted 视为仍待确认。

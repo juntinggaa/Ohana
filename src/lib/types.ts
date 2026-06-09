@@ -255,6 +255,12 @@ export interface FamilyMemoryEntry {
 /* -------------------------------------------------------------------------- */
 
 export type FamilyChatAudience = 'family' | 'assistant'
+export type FamilyChatReactionKind = 'heart' | 'seen'
+
+export interface FamilyChatReaction {
+  memberId: string
+  kind: FamilyChatReactionKind
+}
 
 export interface FamilyChatMessage {
   id: string
@@ -263,8 +269,16 @@ export interface FamilyChatMessage {
   audience: FamilyChatAudience
   body: string
   createdAt: number
+  /** 给助手的提问与回答是个人可见，不混入全家聊天。 */
+  visibility?: 'family' | 'private'
   /** 回答实际引用到的家庭记忆，便于界面说明来源。 */
   memoryIds?: string[]
+  /** 助手回答来自真实 AI，或来自无法联网时的本地记忆查找。 */
+  answerMode?: 'ai' | 'memory' | 'task'
+  /** 在「问欧哈娜」中从本次安排自动整理出的事项。 */
+  taskIds?: string[]
+  replyToId?: string
+  reactions?: FamilyChatReaction[]
 }
 
 export type HouseholdMemoryCategory =
@@ -275,6 +289,17 @@ export type HouseholdMemoryCategory =
   | 'contact'
   | 'other'
 
+export type HouseholdMemoryVisibility = 'family' | 'selected' | 'private'
+
+export interface HouseholdMemoryPhoto {
+  id: string
+  dataUrl: string
+  fileName: string
+  caption?: string
+  uploadedById?: string
+  createdAt: number
+}
+
 export interface HouseholdMemory {
   id: string
   title: string
@@ -284,4 +309,11 @@ export interface HouseholdMemory {
   createdAt: number
   createdById?: string
   sourceMessageId?: string
+  visibility?: HouseholdMemoryVisibility
+  sharedWithIds?: string[]
+  pinned?: boolean
+  updatedAt?: number
+  confirmedAt?: number
+  /** 位置现场图，例如医药卡所在的抽屉或文件袋。 */
+  photos?: HouseholdMemoryPhoto[]
 }

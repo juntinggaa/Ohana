@@ -99,9 +99,9 @@ export function DashboardPage() {
         description="把近况和牵挂放在一起，每个人都可以看看、说说、搭把手。"
         actions={
           mode !== 'elder' ? (
-            <Link to="/memory?mode=paste" className="btn-primary">
+            <Link to="/memory?view=assistant" className="btn-primary">
               <InboxIcon size={14} />
-              带入一段家人消息
+              告诉欧哈娜一项安排
             </Link>
           ) : undefined
         }
@@ -208,7 +208,7 @@ function EmptyOverview() {
 
   function openSampleInbox() {
     resetToSampleData()
-    navigate('/memory?mode=paste')
+    navigate('/memory?view=assistant&ask=27%20March%209%3A30am%20%E5%B8%A6%E7%88%B8%E7%88%B8%E5%8E%BB%E5%8C%BB%E9%99%A2')
   }
 
   return (
@@ -221,9 +221,9 @@ function EmptyOverview() {
             当群聊里出现需要记住的小事，欧哈娜也会帮你轻轻接住，不让谁一个人操心。
           </p>
           <div className="flex items-center justify-center gap-3">
-            <Link to="/memory?mode=paste" className="btn-primary">
+            <Link to="/memory?view=assistant" className="btn-primary">
               <InboxIcon size={14} />
-              带入家人消息
+              告诉欧哈娜一项安排
             </Link>
             <button className="btn-outline" onClick={openSampleInbox}>
               看一个家庭示例
@@ -237,7 +237,10 @@ function EmptyOverview() {
 
 function ConnectionStarters() {
   const chatMessages = useAppStore((s) => s.familyChatMessages)
-  const recentMessages = useMemo(() => chatMessages.slice(-2).reverse(), [chatMessages])
+  const recentMessages = useMemo(
+    () => chatMessages.filter((message) => message.audience === 'family').slice(-2).reverse(),
+    [chatMessages],
+  )
   const memories = useAppStore((s) => s.householdMemories)
   const members = useAppStore((s) => s.familyMembers)
   const moments = [

@@ -1,7 +1,14 @@
-import { callDeepSeek, callRemoteWithFallback, type LLMResponse } from '../llm/llmClient'
+import {
+  callDeepSeek,
+  callRemoteWithFallback,
+  type LLMChatMessage,
+  type LLMResponse,
+} from '../llm/llmClient'
 import type {
   HouseholdMemory,
   HouseholdMemoryCategory,
+  HouseholdMemoryVisibility,
+  TaskCategory,
 } from '../types'
 
 export interface FamilyAnswer {
@@ -11,8 +18,14 @@ export interface FamilyAnswer {
 
 type HouseholdMemoryDraft = Omit<HouseholdMemory, 'id' | 'createdAt'>
 
+export interface CareRequestDraft {
+  title: string
+  category: TaskCategory
+  dueDateText?: string
+}
+
 const TOPIC_KEYWORDS = [
-  ['医药卡', '医保卡', '医疗卡', '就诊卡'],
+  ['医药卡', '医保卡', '医疗卡', '就诊卡', 'yiyao ka', 'yiyaoka', 'medical card'],
   ['复诊', '看病', '门诊', '预约'],
   ['药', '用药', '药盒', '处方'],
   ['钥匙', '门禁卡'],
@@ -60,7 +73,7 @@ export function isRememberableFamilyFact(text: string): boolean {
   if (/[?？]$/.test(text.trim())) return false
   return (
     /^请记住/.test(text.trim()) ||
-    /(医药卡|医保卡|就诊卡|证件|钥匙|门禁卡|药盒|复诊资料).*(放在|收在|装在|留在)/.test(text) ||
+    /(医药卡|医保卡|就诊卡|证件|钥匙|门禁卡|药盒|复诊资料).*(在|收好|存于)/.test(text) ||
     /(复诊|门诊|预约).*(需要带|请带|要带|时间是)/.test(text)
   )
 }
@@ -69,6 +82,8 @@ export function draftHouseholdMemory(
   rawText: string,
   createdById?: string,
   sourceMessageId?: string,
+  visibility: HouseholdMemoryVisibility = 'family',
+  sharedWithIds?: string[],
 ): HouseholdMemoryDraft {
   const detail = cleanText(rawText)
   const title = titleFor(detail)
@@ -79,18 +94,58 @@ export function draftHouseholdMemory(
     keywords: keywordsFor(detail, title),
     createdById,
     sourceMessageId,
+    visibility,
+    sharedWithIds,
+    confirmedAt: Date.now(),
   }
 }
 
+export function canViewHouseholdMemory(
+  memory: HouseholdMemory,
+  currentUserId: string,
+): boolean {
+  if (!memory.visibility || memory.visibility === 'family') return true
+  if (memory.createdById === currentUserId) return true
+  if (memory.visibility === 'private') return false
+  return (memory.sharedWithIds ?? []).includes(currentUserId)
+}
+
+export function isCareRequestCandidate(text: string): boolean {
+  return /(谁方便|能不能帮|可以帮|帮忙|陪着|陪我|陪爸|陪妈|药.*(快没|没了|补|买)|复诊.*(陪|准备|带)|血压.*(高|低)|头晕|胸闷|燃气.*(检|修)|接孩子)/.test(text)
+}
+
+export function draftCareRequest(text: string): CareRequestDraft | null {
+  if (!isCareRequestCandidate(text)) return null
+  if (/药.*(快没|没了|补|买)/.test(text)) {
+    return { title: '为家人补好药品', category: 'elderly_care', dueDateText: '今晚前' }
+  }
+  if (/复诊|看病|医院|门诊/.test(text)) {
+    return { title: '陪家人安心复诊', category: 'medical', dueDateText: '到预约日' }
+  }
+  if (/血压|头晕|胸闷/.test(text)) {
+    return { title: '留意家人的身体感受', category: 'elderly_care', dueDateText: '今天' }
+  }
+  if (/燃气|维修|物业/.test(text)) {
+    return { title: '照看家中检修', category: 'household_admin', dueDateText: '本周内' }
+  }
+  if (/接孩子|学校|幼儿园/.test(text)) {
+    return { title: '陪孩子处理学校安排', category: 'child_school', dueDateText: '到截止日' }
+  }
+  return { title: text.slice(0, 18), category: 'general_family' }
+}
+
 function relevanceScore(question: string, memory: HouseholdMemory): number {
+  const normalizedQuestion = question.toLowerCase()
+  const normalizedTitle = memory.title.toLowerCase()
+  const normalizedDetail = memory.detail.toLowerCase()
   let score = 0
-  if (question.includes(memory.title)) score += 8
+  if (normalizedQuestion.includes(normalizedTitle)) score += 8
   memory.keywords.forEach((keyword) => {
-    if (question.includes(keyword)) score += 4
+    if (normalizedQuestion.includes(keyword.toLowerCase())) score += 4
   })
   TOPIC_KEYWORDS.forEach((group) => {
-    const queryMatches = group.some((word) => question.includes(word))
-    const noteMatches = group.some((word) => memory.detail.includes(word))
+    const queryMatches = group.some((word) => normalizedQuestion.includes(word.toLowerCase()))
+    const noteMatches = group.some((word) => normalizedDetail.includes(word.toLowerCase()))
     if (queryMatches && noteMatches) score += 3
   })
   return score
@@ -105,7 +160,7 @@ function relevantMemories(question: string, memories: HouseholdMemory[]): Househ
     .map((item) => item.memory)
 }
 
-function localAnswer(question: string, memories: HouseholdMemory[]): FamilyAnswer {
+function localMemoryAnswer(question: string, memories: HouseholdMemory[]): FamilyAnswer {
   const found = relevantMemories(question, memories)
   if (found.length > 0) {
     const recorded = found.map((memory) => memory.detail).join('；')
@@ -133,24 +188,17 @@ function localAnswer(question: string, memories: HouseholdMemory[]): FamilyAnswe
   }
 
   return {
-    text: '我还没有在家中记忆里找到答案。知道的家人可以发一句「请记住：……」，保存后我就能替大家找回来。',
+    text: '我还没有在家中记忆里找到答案。目前没有连上 AI，知道的家人可以在聊天里说出这条信息，再点「保存到记忆本」。',
     memoryIds: [],
   }
 }
 
-export async function answerFromHouseholdMemory(args: {
+export async function answerFromOhana(args: {
   question: string
   memories: HouseholdMemory[]
-  useRemoteAI?: boolean
+  history?: LLMChatMessage[]
 }): Promise<LLMResponse<FamilyAnswer>> {
-  const fallback = localAnswer(args.question, args.memories)
-  if (!args.useRemoteAI) {
-    return {
-      mode: 'mock',
-      data: fallback,
-      mockNote: '根据本地家中记忆作答',
-    }
-  }
+  const fallback = localMemoryAnswer(args.question, args.memories)
   const matched = relevantMemories(args.question, args.memories)
   const context = matched.length > 0
     ? matched.map((memory) => `- ${memory.title}: ${memory.detail}`).join('\n')
@@ -158,16 +206,20 @@ export async function answerFromHouseholdMemory(args: {
 
   return callRemoteWithFallback({
     fallback,
-    mockNote: '根据家中记忆作答',
+    mockNote: 'AI 未连接时仅根据家中记忆作答',
     remote: async () => {
       const text = await callDeepSeek({
         system: [
-          '你是温柔、克制的家庭记忆助手。',
-          '涉及物品位置、预约安排或家人私人事实时，只能依据提供的家中记忆回答；没有记录就明确说不知道。',
-          '涉及就医准备时，可提示核对医院通知，不提供诊断。',
-          '回答使用简短自然的简体中文，不要创造任务或派人做事。',
+          '你是欧哈娜，一位温暖、可靠的家庭对话助手。',
+          '你可以回答一般生活问题、情绪支持问题和通识健康问题，也可以依据家庭记忆回答家中具体事实。',
+          '涉及家中物品位置、证件、预约安排或家人私人事实时，只能依据提供的家庭记忆；没有记录就明确说不知道，不要猜测。',
+          '涉及健康、治疗、化疗或用药时，提供简短的一般信息和就医提醒，不做诊断，不替代医疗团队；有紧急症状时建议及时求助。',
+          '涉及附近、最近、门店或实时信息时，如果没有确切地点或实时查询结果，请询问所在位置或说明无法判断最近，不要编造店名。',
+          '家庭记忆与问题无关时，不要强行引用它。',
+          '用自然、易懂的简体中文回答，通常保持简短。',
         ].join('\n'),
-        user: `家中记忆：\n${context}\n\n家人的问题：${args.question}`,
+        history: args.history,
+        user: `可参考的家庭记忆（仅在与问题有关时使用）：\n${context}\n\n家人的问题：${args.question}`,
         temperature: 0.2,
       })
       return {
